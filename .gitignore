@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+*.log
+*.tsbuildinfo
+.DS_Store
+
+# Variáveis de ambiente locais (os modelos ficam em .env.example)
+.env
+.env.local
+
+# Prisma Client gerado a partir do schema (npm install / prisma generate recria)
+backend/src/generated/

@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Convenções:
+// - Tabelas e colunas em snake_case no banco (@@map/@map), camelCase no código.
+// - IDs UUIDv7: não dá para enumerar e, por serem ordenados no tempo, indexam melhor que o v4.
+// - Instantes (createdAt etc.) em timestamptz; datas "de calendário" (vencimentos) usarão date.
+
+model User {
+  id                 String   @id @default(uuid(7)) @db.Uuid
+  name               String
+  email              String   @unique // sempre salvo em minúsculas
+  passwordHash       String   @map("password_hash")
+  remindersEnabled   Boolean  @default(true) @map("reminders_enabled")
+  reminderDaysBefore Int      @default(1) @map("reminder_days_before")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  // SHA-256 do token. O token em si só existe no cookie do usuário.
+  tokenHash String    @unique @map("token_hash")
+  // Todos os tokens de uma mesma sessão (cadeia de rotação). Se um token já
+  // usado reaparecer, a família inteira é revogada.
+  familyId  String    @map("family_id") @db.Uuid
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
