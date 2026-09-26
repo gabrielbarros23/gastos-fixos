@@ -10,10 +10,11 @@ export const MAX_AMOUNT_CENTS = 100_000_000;
  * 0.1 + 0.2 !== 0.3 em ponto flutuante, e somas de centenas de valores
  * acumulariam erro.
  */
-export function IsAmountCents() {
+export function IsAmountCents({ required = true } = {}) {
   return applyDecorators(
     ApiProperty({
       type: 'integer',
+      required,
       minimum: 1,
       maximum: MAX_AMOUNT_CENTS,
       description: 'Valor em centavos (R$ 55,90 = 5590)',

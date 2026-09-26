@@ -73,6 +73,40 @@ export async function registerUser(
   };
 }
 
+export function authHeader(user: RegisteredUser): { Authorization: string } {
+  return { Authorization: `Bearer ${user.accessToken}` };
+}
+
+/** IDs das categorias do usuário, por nome (as 5 padrão já existem). */
+export async function categoryIdsByName(
+  app: INestApplication<Server>,
+  user: RegisteredUser,
+): Promise<Record<string, string>> {
+  const res = await request(app.getHttpServer())
+    .get('/api/categories')
+    .set(authHeader(user))
+    .expect(200);
+  return Object.fromEntries(
+    res.body.map((c: { id: string; name: string }) => [c.name, c.id]),
+  );
+}
+
+/** Cria um gasto via API e devolve o corpo da resposta. */
+export async function createExpense(
+  app: INestApplication<Server>,
+  user: RegisteredUser,
+  body: Record<string, unknown>,
+): Promise<
+  { id: string; amounts: { id: string }[] } & Record<string, unknown>
+> {
+  const res = await request(app.getHttpServer())
+    .post('/api/expenses')
+    .set(authHeader(user))
+    .send({ frequency: 'MONTHLY', ...body })
+    .expect(201);
+  return res.body;
+}
+
 /** Extrai o par `refresh_token=<valor>` do Set-Cookie, pronto para reenviar. */
 export function getRefreshCookie(res: request.Response): string {
   const header = res.headers['set-cookie'] as unknown as string[] | undefined;
