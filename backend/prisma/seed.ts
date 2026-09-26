@@ -1,0 +1,210 @@
+/**
+ * Dados de demonstração: `npm run db:seed`.
+ *
+ * Cria (ou recria do zero) o usuário demo com gastos variados, com datas
+ * relativas ao ano atual para o calendário sempre ter o que mostrar.
+ *
+ *   e-mail: demo@gastos.dev
+ *   senha:  demo12345
+ */
+import 'dotenv/config';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { hash } from 'bcryptjs';
+import { DEFAULT_CATEGORIES } from '../src/categories/default-categories.js';
+import {
+  addMonthsClamped,
+  fromParts,
+  toDbDate,
+  todayIn,
+  toParts,
+  type CalendarDate,
+} from '../src/domain/calendar-date.js';
+import {
+  endDateForInstallments,
+  type Frequency,
+} from '../src/domain/recurrence.js';
+import { PrismaClient } from '../src/generated/prisma/client.js';
+
+const DEMO_EMAIL = 'demo@gastos.dev';
+const DEMO_PASSWORD = 'demo12345';
+
+type CategoryName = (typeof DEFAULT_CATEGORIES)[number]['name'];
+
+interface SeedExpense {
+  name: string;
+  description?: string;
+  category: CategoryName;
+  frequency: Frequency;
+  interval?: number;
+  startDate: CalendarDate;
+  installments?: number;
+  deactivatedAt?: CalendarDate;
+  /** Primeiro valor + mudanças de preço, em centavos. */
+  amounts: { amountCents: number; effectiveFrom: CalendarDate }[];
+}
+
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+});
+
+function buildExpenses(today: CalendarDate): SeedExpense[] {
+  const { year, month } = toParts(today);
+  const date = (m: number, d: number) => fromParts({ year, month: m, day: d });
+  // Celular comprado há 3 meses, em 12x no dia 20
+  const phoneStart = addMonthsClamped(fromParts({ year, month, day: 20 }), -3);
+
+  return [
+    {
+      name: 'Aluguel',
+      category: 'Moradia',
+      frequency: 'MONTHLY',
+      startDate: date(1, 5),
+      amounts: [{ amountCents: 150000, effectiveFrom: date(1, 5) }],
+    },
+    {
+      name: 'Condomínio',
+      description: 'Vence no último dia do mês',
+      category: 'Moradia',
+      frequency: 'MONTHLY',
+      startDate: date(1, 31), // cai em 28/02 (ou 29/02) e volta ao dia 31
+      amounts: [{ amountCents: 48000, effectiveFrom: date(1, 31) }],
+    },
+    {
+      name: 'Netflix',
+      description: 'Plano padrão',
+      category: 'Streaming',
+      frequency: 'MONTHLY',
+      startDate: date(1, 10),
+      amounts: [
+        { amountCents: 4490, effectiveFrom: date(1, 10) },
+        { amountCents: 5990, effectiveFrom: date(6, 15) }, // aumento no meio do ano
+      ],
+    },
+    {
+      name: 'Spotify',
+      category: 'Streaming',
+      frequency: 'MONTHLY',
+      startDate: date(1, 22),
+      amounts: [{ amountCents: 2190, effectiveFrom: date(1, 22) }],
+    },
+    {
+      name: 'Academia',
+      category: 'Saúde',
+      frequency: 'MONTHLY',
+      startDate: date(2, 15),
+      amounts: [{ amountCents: 9990, effectiveFrom: date(2, 15) }],
+    },
+    {
+      name: 'Plano de saúde',
+      category: 'Saúde',
+      frequency: 'MONTHLY',
+      startDate: date(1, 12),
+      amounts: [{ amountCents: 42000, effectiveFrom: date(1, 12) }],
+    },
+    {
+      name: 'Celular',
+      description: 'Parcelado em 12x',
+      category: 'Outros',
+      frequency: 'MONTHLY',
+      startDate: phoneStart,
+      installments: 12,
+      amounts: [{ amountCents: 25000, effectiveFrom: phoneStart }],
+    },
+    {
+      name: 'IPVA',
+      category: 'Transporte',
+      frequency: 'YEARLY',
+      startDate: date(3, 20),
+      amounts: [{ amountCents: 180000, effectiveFrom: date(3, 20) }],
+    },
+    {
+      name: 'Seguro do carro',
+      category: 'Transporte',
+      frequency: 'MONTHLY',
+      interval: 6, // semestral
+      startDate: date(4, 10),
+      amounts: [{ amountCents: 110000, effectiveFrom: date(4, 10) }],
+    },
+    {
+      name: 'Diarista',
+      category: 'Moradia',
+      frequency: 'WEEKLY',
+      interval: 2, // quinzenal
+      startDate: date(1, 7),
+      amounts: [{ amountCents: 18000, effectiveFrom: date(1, 7) }],
+    },
+    {
+      name: 'Curso de inglês',
+      description: 'Cancelado em julho',
+      category: 'Outros',
+      frequency: 'MONTHLY',
+      startDate: date(1, 8),
+      deactivatedAt: date(7, 1),
+      amounts: [{ amountCents: 35000, effectiveFrom: date(1, 8) }],
+    },
+  ];
+}
+
+async function main(): Promise<void> {
+  const today = todayIn(process.env.APP_TIMEZONE ?? 'America/Sao_Paulo');
+
+  // Recria do zero (a exclusão do usuário apaga tudo em cascata).
+  await prisma.user.deleteMany({ where: { email: DEMO_EMAIL } });
+
+  const user = await prisma.user.create({
+    data: {
+      name: 'Usuário Demo',
+      email: DEMO_EMAIL,
+      passwordHash: await hash(DEMO_PASSWORD, 12),
+      categories: { create: [...DEFAULT_CATEGORIES] },
+    },
+    include: { categories: true },
+  });
+  const categoryId = (name: CategoryName) =>
+    user.categories.find((category) => category.name === name)!.id;
+
+  for (const expense of buildExpenses(today)) {
+    const interval = expense.interval ?? 1;
+    const endDate = expense.installments
+      ? endDateForInstallments(
+          {
+            frequency: expense.frequency,
+            interval,
+            startDate: expense.startDate,
+          },
+          expense.installments,
+        )
+      : null;
+
+    await prisma.expense.create({
+      data: {
+        userId: user.id,
+        categoryId: categoryId(expense.category),
+        name: expense.name,
+        description: expense.description ?? null,
+        frequency: expense.frequency,
+        interval,
+        startDate: toDbDate(expense.startDate),
+        endDate: endDate ? toDbDate(endDate) : null,
+        installmentCount: expense.installments ?? null,
+        deactivatedAt: expense.deactivatedAt
+          ? toDbDate(expense.deactivatedAt)
+          : null,
+        amounts: {
+          create: expense.amounts.map((amount) => ({
+            amountCents: amount.amountCents,
+            effectiveFrom: toDbDate(amount.effectiveFrom),
+          })),
+        },
+      },
+    });
+  }
+
+  console.log(`Seed concluído: ${DEMO_EMAIL} / ${DEMO_PASSWORD}`);
+}
+
+try {
+  await main();
+} finally {
+  await prisma.$disconnect();
+}
