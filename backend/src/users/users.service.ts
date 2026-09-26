@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { DEFAULT_CATEGORIES } from '../categories/default-categories.js';
 import type { User } from '../generated/prisma/client.js';
 import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -20,7 +21,11 @@ export class UsersService {
 
   async create(data: CreateUserData): Promise<User> {
     try {
-      return await this.prisma.user.create({ data });
+      // Escrita aninhada: usuário e categorias padrão entram na mesma
+      // transação. Ou nasce tudo, ou nada (não existe usuário sem categorias).
+      return await this.prisma.user.create({
+        data: { ...data, categories: { create: [...DEFAULT_CATEGORIES] } },
+      });
     } catch (error) {
       // Confia na unique constraint em vez de consultar antes e inserir depois:
       // o "consulta e insere" tem condição de corrida entre dois cadastros simultâneos.
