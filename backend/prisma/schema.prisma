@@ -93,6 +93,7 @@ model Expense {
   // Restrict: o banco impede excluir uma categoria que ainda tem gastos.
   category Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   amounts  ExpenseAmount[]
+  payments Payment[]
 
   @@index([userId])
   // O Postgres não indexa FKs sozinho; sem isso, cada exclusão de categoria
@@ -114,4 +115,22 @@ model ExpenseAmount {
 
   @@unique([expenseId, effectiveFrom])
   @@map("expense_amounts")
+}
+
+// Uma ocorrência só é gravada quando algo acontece com ela: aqui, o pagamento.
+// Ela é identificada pela chave natural (expense_id, due_date), a mesma que a
+// regra de recorrência calcula, então não existe "id de ocorrência".
+model Payment {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  expenseId       String   @map("expense_id") @db.Uuid
+  dueDate         DateTime @map("due_date") @db.Date // qual vencimento foi pago
+  paidAmountCents Int      @map("paid_amount_cents") // pode diferir do previsto (juros, desconto)
+  paidAt          DateTime @map("paid_at") @db.Date // quando o usuário pagou
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  @@unique([expenseId, dueDate])
+  @@map("payments")
 }
