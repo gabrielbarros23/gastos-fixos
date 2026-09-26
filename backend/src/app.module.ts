@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { CategoriesModule } from './categories/categories.module.js';
 import { ClockModule } from './common/clock/clock.module.js';
 import { NodeEnv, validateEnv, type Env } from './config/env.validation.js';
+import { ExpensesModule } from './expenses/expenses.module.js';
 import { HealthController } from './health/health.controller.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { UsersModule } from './users/users.module.js';
@@ -31,6 +32,7 @@ import { UsersModule } from './users/users.module.js';
     UsersModule,
     AuthModule,
     CategoriesModule,
+    ExpensesModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
