@@ -23,6 +23,8 @@ model User {
   updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   refreshTokens RefreshToken[]
+  categories    Category[]
+  expenses      Expense[]
 
   @@map("users")
 }
@@ -44,4 +46,72 @@ model RefreshToken {
   @@index([userId])
   @@index([familyId])
   @@map("refresh_tokens")
+}
+
+enum Frequency {
+  WEEKLY // a cada `interval` semanas
+  MONTHLY // a cada `interval` meses (3 = trimestral, 6 = semestral)
+  YEARLY // a cada `interval` anos
+
+  @@map("frequency")
+}
+
+model Category {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  name      String
+  color     String // "#RRGGBB"
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenses Expense[]
+
+  @@unique([userId, name])
+  @@map("categories")
+}
+
+// Guarda a REGRA do gasto. As ocorrências (cada vencimento) são calculadas sob
+// demanda a partir dela e nunca são gravadas antecipadamente.
+model Expense {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  categoryId       String    @map("category_id") @db.Uuid
+  name             String
+  description      String?
+  frequency        Frequency
+  interval         Int       @default(1)
+  // Datas "de calendário" (sem hora e sem fuso): coluna date.
+  startDate        DateTime  @map("start_date") @db.Date // 1º vencimento; define o dia âncora
+  endDate          DateTime? @map("end_date") @db.Date // último vencimento possível (inclusivo)
+  installmentCount Int?      @map("installment_count") // se informado, endDate é calculada
+  deactivatedAt    DateTime? @map("deactivated_at") @db.Date // null = ativo
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Restrict: o banco impede excluir uma categoria que ainda tem gastos.
+  category Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  amounts  ExpenseAmount[]
+
+  @@index([userId])
+  // O Postgres não indexa FKs sozinho; sem isso, cada exclusão de categoria
+  // faria um scan em expenses para checar o Restrict.
+  @@index([categoryId])
+  @@map("expenses")
+}
+
+// Histórico de valor: mudar o preço é inserir uma linha nova com a data de
+// vigência. O valor de um vencimento é o da maior vigência <= a data dele.
+model ExpenseAmount {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  expenseId     String   @map("expense_id") @db.Uuid
+  amountCents   Int      @map("amount_cents") // centavos, nunca float
+  effectiveFrom DateTime @map("effective_from") @db.Date
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  @@unique([expenseId, effectiveFrom])
+  @@map("expense_amounts")
 }
