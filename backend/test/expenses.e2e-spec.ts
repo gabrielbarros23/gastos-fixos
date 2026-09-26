@@ -438,6 +438,45 @@ describe('Gastos fixos (e2e)', () => {
         .expect(200);
       expect(res.body).toEqual([expect.objectContaining({ id: initialId })]);
     });
+
+    it('corrige um valor digitado errado, inclusive o inicial, e o passado acompanha', async () => {
+      // Digitou 559,00 em vez de 55,90
+      const expense = await createExpense({
+        amountCents: 55900,
+        startDate: '2026-01-10',
+      });
+      const initialId = expense.amounts[0].id;
+
+      const res = await api()
+        .patch(`/api/expenses/${expense.id}/amounts/${initialId}`)
+        .set(auth())
+        .send({ amountCents: 5590 })
+        .expect(200);
+      expect(res.body).toEqual({
+        id: initialId,
+        amountCents: 5590,
+        effectiveFrom: '2026-01-10',
+      });
+
+      const occurrences = await api()
+        .get('/api/occurrences?from=2026-01-01&to=2026-01-31')
+        .set(auth())
+        .expect(200);
+      expect(occurrences.body.totalExpectedCents).toBe(5590);
+    });
+
+    it('correção de valor valida o corpo (400) e o dono (404)', async () => {
+      const expense = await createExpense();
+      const url = `/api/expenses/${expense.id}/amounts/${expense.amounts[0].id}`;
+
+      await api().patch(url).set(auth()).send({ amountCents: 0 }).expect(400);
+      const other = await registerUser(ctx.app);
+      await api()
+        .patch(url)
+        .set(auth(other))
+        .send({ amountCents: 100 })
+        .expect(404);
+    });
   });
 
   describe('desativar e reativar', () => {

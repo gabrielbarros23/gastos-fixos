@@ -14,6 +14,7 @@ import { isUniqueViolation } from '../prisma/prisma-errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateAmountDto } from './dto/create-amount.dto.js';
 import { AmountResponseDto } from './dto/expense-response.dto.js';
+import { UpdateAmountDto } from './dto/update-amount.dto.js';
 import { ExpensesService } from './expenses.service.js';
 
 /**
@@ -67,23 +68,54 @@ export class ExpenseAmountsService {
     }
   }
 
+  /**
+   * Corrige o valor de um registro (ex.: digitou 559,00 em vez de 55,90).
+   * É diferente de uma mudança de preço: aqui o valor estava ERRADO desde o
+   * início, então os vencimentos já passados também devem mudar. Os pagamentos
+   * não são afetados, porque guardam o valor que foi efetivamente pago.
+   */
+  async correct(
+    userId: string,
+    expenseId: string,
+    amountId: string,
+    dto: UpdateAmountDto,
+  ): Promise<AmountResponseDto> {
+    await this.findAmount(userId, expenseId, amountId);
+    const amount = await this.prisma.expenseAmount.update({
+      where: { id: amountId },
+      data: { amountCents: dto.amountCents },
+    });
+    return AmountResponseDto.from(amount);
+  }
+
   async remove(
     userId: string,
     expenseId: string,
     amountId: string,
   ): Promise<void> {
-    const expense = await this.expenses.findOwned(userId, expenseId);
-    const [initial] = expense.amounts;
-    const amount = expense.amounts.find(({ id }) => id === amountId);
+    const { amount, isInitial } = await this.findAmount(
+      userId,
+      expenseId,
+      amountId,
+    );
+    if (isInitial) {
+      throw new ConflictException(
+        'O valor inicial não pode ser removido; use a correção de valor (PATCH) se ele estiver errado',
+      );
+    }
+    await this.prisma.expenseAmount.delete({ where: { id: amount.id } });
+  }
 
+  private async findAmount(
+    userId: string,
+    expenseId: string,
+    amountId: string,
+  ) {
+    const expense = await this.expenses.findOwned(userId, expenseId);
+    const amount = expense.amounts.find(({ id }) => id === amountId);
     if (!amount) {
       throw new NotFoundException('Valor não encontrado');
     }
-    if (amount.id === initial.id) {
-      throw new ConflictException(
-        'O valor inicial não pode ser removido; para corrigi-lo, exclua e recadastre o gasto',
-      );
-    }
-    await this.prisma.expenseAmount.delete({ where: { id: amountId } });
+    return { amount, isInitial: amount.id === expense.amounts[0].id };
   }
 }

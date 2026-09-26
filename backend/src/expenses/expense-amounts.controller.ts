@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -13,6 +14,7 @@ import { CurrentUser } from '../common/auth/current-user.decorator.js';
 import { UuidParam } from '../common/http/uuid-param.js';
 import { CreateAmountDto } from './dto/create-amount.dto.js';
 import { AmountResponseDto } from './dto/expense-response.dto.js';
+import { UpdateAmountDto } from './dto/update-amount.dto.js';
 import { ExpenseAmountsService } from './expense-amounts.service.js';
 
 @ApiTags('expenses')
@@ -38,6 +40,20 @@ export class ExpenseAmountsController {
     @Body() dto: CreateAmountDto,
   ): Promise<AmountResponseDto> {
     return this.amounts.add(user.id, expenseId, dto);
+  }
+
+  /**
+   * Corrige um valor digitado errado (inclusive o inicial). Diferente de uma
+   * mudança de preço: altera também os vencimentos já passados.
+   */
+  @Patch(':amountId')
+  correct(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('expenseId') expenseId: string,
+    @UuidParam('amountId') amountId: string,
+    @Body() dto: UpdateAmountDto,
+  ): Promise<AmountResponseDto> {
+    return this.amounts.correct(user.id, expenseId, amountId, dto);
   }
 
   /** Desfaz uma mudança de valor (o valor inicial não pode ser removido) */
