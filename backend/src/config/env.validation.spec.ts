@@ -13,6 +13,13 @@ describe('validateEnv', () => {
     expect(env.NODE_ENV).toBe(NodeEnv.Development);
     expect(env.JWT_ACCESS_TTL_SECONDS).toBe(900);
     expect(env.BCRYPT_SALT_ROUNDS).toBe(12);
+    expect(env.APP_TIMEZONE).toBe('America/Sao_Paulo');
+  });
+
+  it('recusa fuso horário que não existe', () => {
+    expect(() =>
+      validateEnv({ ...required, APP_TIMEZONE: 'America/Atlantida' }),
+    ).toThrow(/APP_TIMEZONE/);
   });
 
   it('falha listando todas as variáveis inválidas', () => {

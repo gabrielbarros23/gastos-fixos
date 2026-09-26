@@ -6,6 +6,7 @@ import {
   IsInt,
   IsNotEmpty,
   IsString,
+  IsTimeZone,
   Max,
   Min,
   MinLength,
@@ -56,6 +57,10 @@ export class Env {
   @IsString()
   @IsNotEmpty()
   CORS_ORIGIN: string = 'http://localhost:5173';
+
+  /** Fuso usado para saber "que dia é hoje" (vencimentos são datas sem hora). */
+  @IsTimeZone()
+  APP_TIMEZONE: string = 'America/Sao_Paulo';
 }
 
 export function validateEnv(config: Record<string, unknown>): Env {
