@@ -108,6 +108,18 @@ export class RefreshTokensService {
     }
   }
 
+  /**
+   * Apaga tokens expirados (roda todo dia, pela fila de manutenção). Tokens
+   * revogados mas ainda não expirados ficam: são eles que permitem detectar
+   * o reuso de um token roubado.
+   */
+  async deleteExpired(): Promise<number> {
+    const { count } = await this.prisma.refreshToken.deleteMany({
+      where: { expiresAt: { lt: new Date() } },
+    });
+    return count;
+  }
+
   private async revokeFamily(familyId: string): Promise<void> {
     await this.prisma.refreshToken.updateMany({
       where: { familyId, revokedAt: null },

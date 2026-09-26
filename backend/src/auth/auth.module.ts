@@ -1,12 +1,18 @@
+import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
+import { QUEUES } from '../common/queues/queues.js';
 import type { Env } from '../config/env.validation.js';
 import { UsersModule } from '../users/users.module.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
+import {
+  MaintenanceProcessor,
+  RefreshTokenCleanupScheduler,
+} from './refresh-token-cleanup.js';
 import { RefreshTokensService } from './refresh-tokens.service.js';
 
 @Module({
@@ -21,11 +27,14 @@ import { RefreshTokensService } from './refresh-tokens.service.js';
         },
       }),
     }),
+    BullModule.registerQueue({ name: QUEUES.maintenance }),
   ],
   controllers: [AuthController],
   providers: [
     AuthService,
     RefreshTokensService,
+    RefreshTokenCleanupScheduler,
+    MaintenanceProcessor,
     // Registrado aqui (e não no AppModule) porque depende do JwtService deste módulo.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
   ],
