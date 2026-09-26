@@ -12,6 +12,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { hash } from 'bcryptjs';
 import { DEFAULT_CATEGORIES } from '../src/categories/default-categories.js';
 import {
+  addDays,
   addMonthsClamped,
   fromParts,
   toDbDate,
@@ -19,6 +20,10 @@ import {
   toParts,
   type CalendarDate,
 } from '../src/domain/calendar-date.js';
+import {
+  projectOccurrences,
+  type ExpenseSchedule,
+} from '../src/domain/projection.js';
 import {
   endDateForInstallments,
   type Frequency,
@@ -145,6 +150,32 @@ function buildExpenses(today: CalendarDate): SeedExpense[] {
   ];
 }
 
+/**
+ * Vencimentos já passados ficam pagos no próprio dia, com duas exceções para a
+ * demo ter o que mostrar: a última mensalidade da academia fica em atraso, e a
+ * Netflix de dois meses atrás foi paga com um valor diferente do previsto.
+ */
+function buildPayments(
+  name: string,
+  schedule: ExpenseSchedule,
+  today: CalendarDate,
+) {
+  const yesterday = addDays(today, -1);
+  const past = projectOccurrences(schedule, schedule.startDate, yesterday);
+  const lastTwoMonths = addMonthsClamped(today, -2);
+
+  return past
+    .filter((_, i) => !(name === 'Academia' && i === past.length - 1))
+    .map((o) => ({
+      dueDate: toDbDate(o.dueDate),
+      paidAt: toDbDate(o.dueDate),
+      paidAmountCents:
+        name === 'Netflix' && o.dueDate.startsWith(lastTwoMonths.slice(0, 7))
+          ? o.expectedAmountCents + 350 // pagou com multa
+          : o.expectedAmountCents,
+    }));
+}
+
 async function main(): Promise<void> {
   const today = todayIn(process.env.APP_TIMEZONE ?? 'America/Sao_Paulo');
 
@@ -176,6 +207,13 @@ async function main(): Promise<void> {
         )
       : null;
 
+    const schedule = {
+      ...expense,
+      interval,
+      endDate,
+      installmentCount: expense.installments ?? null,
+    };
+
     await prisma.expense.create({
       data: {
         userId: user.id,
@@ -186,7 +224,7 @@ async function main(): Promise<void> {
         interval,
         startDate: toDbDate(expense.startDate),
         endDate: endDate ? toDbDate(endDate) : null,
-        installmentCount: expense.installments ?? null,
+        installmentCount: schedule.installmentCount,
         deactivatedAt: expense.deactivatedAt
           ? toDbDate(expense.deactivatedAt)
           : null,
@@ -196,6 +234,7 @@ async function main(): Promise<void> {
             effectiveFrom: toDbDate(amount.effectiveFrom),
           })),
         },
+        payments: { create: buildPayments(expense.name, schedule, today) },
       },
     });
   }
