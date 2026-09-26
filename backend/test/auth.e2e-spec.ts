@@ -198,6 +198,16 @@ describe('Autenticação (e2e)', () => {
         .send({ reminderDaysBefore: 31 })
         .expect(400);
     });
+
+    it('PATCH /api/users/me recusa null em campo obrigatório (400)', async () => {
+      const user = await registerUser(ctx.app);
+
+      await api()
+        .patch('/api/users/me')
+        .set('Authorization', `Bearer ${user.accessToken}`)
+        .send({ name: null })
+        .expect(400);
+    });
   });
 
   describe('POST /api/auth/refresh', () => {
