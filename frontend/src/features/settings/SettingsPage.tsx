@@ -1,8 +1,10 @@
-import { LogOut } from 'lucide-react';
+import { LogOut, Send } from 'lucide-react';
 import { useState } from 'react';
 import styled from 'styled-components';
 import { updateMe, type UpdateMeInput } from '../../api/auth';
 import { errorMessage } from '../../api/errors';
+import { runReminders } from '../../api/reminders';
+import { pluralize } from '../../lib/format';
 import { useAuth, useCurrentUser } from '../../auth/AuthProvider';
 import { Button } from '../../components/ui/Button';
 import { Card, CardTitle } from '../../components/ui/Card';
@@ -64,6 +66,22 @@ export function SettingsPage() {
   const [name, setName] = useState(user.name);
   const [saving, setSaving] = useState<keyof UpdateMeInput | null>(null);
 
+  const [runningReminders, setRunningReminders] = useState(false);
+
+  const sendRemindersNow = async () => {
+    setRunningReminders(true);
+    try {
+      const { queued } = await runReminders();
+      if (queued === 0) toast.success('Nenhum lembrete pendente na sua janela de aviso');
+      else
+        toast.success(`${pluralize(queued, 'lembrete enviado', 'lembretes enviados')} para a fila`);
+    } catch (error) {
+      toast.error(errorMessage(error));
+    } finally {
+      setRunningReminders(false);
+    }
+  };
+
   const save = async (input: UpdateMeInput, message: string) => {
     setSaving(Object.keys(input)[0] as keyof UpdateMeInput);
     try {
@@ -120,6 +138,30 @@ export function SettingsPage() {
               ))}
             </Select>
           </Row>
+          {import.meta.env.DEV && (
+            <Row>
+              <div>
+                <strong>Testar agora (desenvolvimento)</strong>
+                <p>
+                  Roda a varredura sem esperar as 8h. Os e-mails aparecem no{' '}
+                  <a href="http://localhost:8025" target="_blank" rel="noreferrer">
+                    Mailpit
+                  </a>
+                  .
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<Send size={16} />}
+                loading={runningReminders}
+                disabled={!user.remindersEnabled}
+                onClick={sendRemindersNow}
+              >
+                Enviar agora
+              </Button>
+            </Row>
+          )}
         </Card>
 
         <Card>
