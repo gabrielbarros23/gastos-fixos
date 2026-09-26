@@ -89,11 +89,12 @@ model Expense {
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   // Restrict: o banco impede excluir uma categoria que ainda tem gastos.
-  category Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  amounts  ExpenseAmount[]
-  payments Payment[]
+  category  Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  amounts   ExpenseAmount[]
+  payments  Payment[]
+  reminders ReminderLog[]
 
   @@index([userId])
   // O Postgres não indexa FKs sozinho; sem isso, cada exclusão de categoria
@@ -133,4 +134,29 @@ model Payment {
 
   @@unique([expenseId, dueDate])
   @@map("payments")
+}
+
+enum ReminderStatus {
+  PENDING // reservado pelo worker, e-mail ainda não confirmado
+  SENT
+
+  @@map("reminder_status")
+}
+
+// Garantia de "no máximo um lembrete por vencimento" (idempotência). A fila
+// também deduplica pelo jobId, mas o job some do Redis depois de concluído;
+// esta tabela é o registro permanente.
+model ReminderLog {
+  id        String         @id @default(uuid(7)) @db.Uuid
+  expenseId String         @map("expense_id") @db.Uuid
+  dueDate   DateTime       @map("due_date") @db.Date
+  status    ReminderStatus @default(PENDING)
+  sentAt    DateTime?      @map("sent_at") @db.Timestamptz(3)
+  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  @@unique([expenseId, dueDate])
+  @@map("reminder_logs")
 }
