@@ -1,3 +1,4 @@
+import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
@@ -11,6 +12,7 @@ import { HealthController } from './health/health.controller.js';
 import { OccurrencesModule } from './occurrences/occurrences.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { RemindersModule } from './reminders/reminders.module.js';
 import { UsersModule } from './users/users.module.js';
 
 @Module({
@@ -29,6 +31,17 @@ import { UsersModule } from './users/users.module.js';
         skipIf: () => config.get('NODE_ENV', { infer: true }) === NodeEnv.Test,
       }),
     }),
+    // Conexão única com o Redis para todas as filas do BullMQ.
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<Env, true>) => ({
+        connection: {
+          host: config.get('REDIS_HOST', { infer: true }),
+          port: config.get('REDIS_PORT', { infer: true }),
+        },
+        prefix: config.get('QUEUE_PREFIX', { infer: true }),
+      }),
+    }),
     PrismaModule,
     ClockModule,
     UsersModule,
@@ -37,6 +50,7 @@ import { UsersModule } from './users/users.module.js';
     ExpensesModule,
     OccurrencesModule,
     PaymentsModule,
+    RemindersModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
