@@ -9,10 +9,7 @@ import { UsersModule } from '../users/users.module.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
-import {
-  MaintenanceProcessor,
-  RefreshTokenCleanupScheduler,
-} from './refresh-token-cleanup.js';
+import { MaintenanceProcessor, RefreshTokenCleanupScheduler, } from './refresh-token-cleanup.js';
 import { RefreshTokensService } from './refresh-tokens.service.js';
 
 @Module({

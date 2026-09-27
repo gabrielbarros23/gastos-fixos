@@ -11,7 +11,7 @@ export type CalendarDate = string & { readonly __brand: 'CalendarDate' };
 
 export interface DateParts {
   year: number;
-  /** 1 a 12 */
+  /* 1 a 12 */
   month: number;
   day: number;
 }
@@ -136,8 +136,13 @@ export function todayIn(
     month: 'numeric',
     day: 'numeric',
   }).formatToParts(now);
-  const get = (type: Intl.DateTimeFormatPartTypes) =>
-    Number(parts.find((part) => part.type === type)?.value);
+
+  const get = (type: Intl.DateTimeFormatPartTypes) =>(
+    Number(parts.find((part) => 
+      (part.type === type))?.value
+    )
+  );
+
   return fromParts({ year: get('year'), month: get('month'), day: get('day') });
 }
 
