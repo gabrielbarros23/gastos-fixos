@@ -1,15 +1,22 @@
 import { ChartColumnBig, ChevronLeft, ChevronRight } from 'lucide-react';
-import styled from 'styled-components';
+import styled, { useTheme } from 'styled-components';
 import { useSummary } from '../../api/occurrences';
+import type { Summary } from '../../api/types';
 import { Button, IconButton } from '../../components/ui/Button';
 import { Card, CardTitle, ColorDot } from '../../components/ui/Card';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { PaymentMethodIcon } from '../../components/ui/PaymentMethodIcon';
 import { CenteredSpinner, Spinner } from '../../components/ui/Spinner';
 import { EmptyState, ErrorState } from '../../components/ui/States';
 import { currentYearMonth, formatYearMonth, shiftYearMonth } from '../../lib/dates';
-import { capitalize, formatCents } from '../../lib/format';
+import { capitalize, formatCents, pluralize } from '../../lib/format';
+import {
+  describeInvoice,
+  NO_PAYMENT_METHOD,
+  PAYMENT_METHOD_TYPE_LABEL,
+} from '../../lib/payment-methods';
 import { useMonthParam } from '../../lib/useMonthParam';
-import { ProjectionChart } from './ProjectionChart';
+import { ProjectionChart, type ProjectionSegment } from './ProjectionChart';
 
 const StatGrid = styled.div`
   display: grid;
@@ -73,7 +80,8 @@ const Columns = styled.div`
   gap: ${({ theme }) => theme.space[4]};
 
   @media (min-width: 900px) {
-    grid-template-columns: 3fr 2fr;
+    /* minmax(0, …): as colunas podem encolher abaixo da largura do conteúdo. */
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   }
 `;
 
@@ -121,20 +129,94 @@ const CategoryBar = styled.div<{ $color: string; $percent: number }>`
   }
 `;
 
+const MethodGrid = styled.ul`
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  /* Quantas colunas couberem, com no mínimo 300px cada (sem forçar rolagem). */
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  gap: ${({ theme }) => theme.space[4]} ${({ theme }) => theme.space[6]};
+`;
+
+const MethodRow = styled.li`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space[3]};
+  min-width: 0;
+`;
+
+const MethodInfo = styled.div`
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  small {
+    font-size: ${({ theme }) => theme.font.size.xs};
+    color: ${({ theme }) => theme.colors.textMuted};
+  }
+`;
+
+const MethodAmount = styled.div`
+  text-align: right;
+  white-space: nowrap;
+
+  strong {
+    display: block;
+    font-size: ${({ theme }) => theme.font.size.lg};
+  }
+  small {
+    font-size: ${({ theme }) => theme.font.size.xs};
+    color: ${({ theme }) => theme.colors.textMuted};
+  }
+`;
+
+const SummaryCard = styled(Card)`
+  margin-bottom: ${({ theme }) => theme.space[4]};
+`;
+
 const MonthNav = styled.div`
   display: flex;
   align-items: center;
   gap: ${({ theme }) => theme.space[1]};
 `;
 
+type MethodTotals = Summary['projection'][number]['byPaymentMethod'][number];
+
+/**
+ * Segmentos do gráfico numa ordem fixa (alfabética, "sem forma" por último):
+ * a mesma forma de pagamento fica sempre na mesma posição da pilha.
+ */
+function toSegments(items: MethodTotals[]): ProjectionSegment[] {
+  return [...items]
+    .sort((a, b) => {
+      if (!a.paymentMethod || !b.paymentMethod) return a.paymentMethod ? -1 : 1;
+      return a.paymentMethod.name.localeCompare(b.paymentMethod.name, 'pt-BR');
+    })
+    .map(({ paymentMethod, expectedCents }) => ({
+      key: paymentMethod?.id ?? 'none',
+      label: paymentMethod?.name ?? NO_PAYMENT_METHOD,
+      color: paymentMethod?.color,
+      cents: expectedCents,
+    }));
+}
+
 export function SummaryPage() {
   const [month, setMonth] = useMonthParam();
   const { data, isPending, isError, error, refetch, isFetching } = useSummary(month);
+  const theme = useTheme();
 
   const header = (
     <PageHeader
       title="Resumo"
-      subtitle={`${capitalize(formatYearMonth(month))} · previsto x pago`}
+      subtitle={`${capitalize(formatYearMonth(month))} · quanto cada forma de pagamento vai cobrar`}
       actions={
         <MonthNav>
           {isFetching && !isPending && <Spinner $size={16} />}
@@ -226,11 +308,70 @@ export function SummaryPage() {
         </Track>
       </Progress>
 
+      <SummaryCard>
+        <CardTitle>Por forma de pagamento</CardTitle>
+        {data.byPaymentMethod.length === 0 ? (
+          <p>Nenhuma cobrança neste mês.</p>
+        ) : (
+          <MethodGrid>
+            {data.byPaymentMethod.map(
+              ({
+                paymentMethod,
+                invoice,
+                expectedCents,
+                paidCents,
+                pendingCents,
+                occurrenceCount,
+              }) => (
+                <MethodRow key={paymentMethod?.id ?? 'none'}>
+                  <PaymentMethodIcon method={paymentMethod} />
+                  <MethodInfo>
+                    <strong>{paymentMethod?.name ?? NO_PAYMENT_METHOD}</strong>
+                    <small>
+                      {invoice
+                        ? describeInvoice(invoice)
+                        : paymentMethod
+                          ? PAYMENT_METHOD_TYPE_LABEL[paymentMethod.type]
+                          : 'Escolha a forma nos gastos'}
+                      {' · '}
+                      {pluralize(occurrenceCount, 'conta', 'contas')}
+                    </small>
+                    <CategoryBar
+                      $color={paymentMethod?.color ?? theme.colors.borderStrong}
+                      $percent={(expectedCents / data.expectedCents) * 100}
+                    />
+                  </MethodInfo>
+                  <MethodAmount>
+                    <strong>{formatCents(expectedCents)}</strong>
+                    <small>
+                      {pendingCents === 0
+                        ? `pago ${formatCents(paidCents)}`
+                        : `falta ${formatCents(pendingCents)}`}
+                    </small>
+                  </MethodAmount>
+                </MethodRow>
+              ),
+            )}
+          </MethodGrid>
+        )}
+      </SummaryCard>
+
       <Columns>
         <Card>
           <CardTitle>Próximos 6 meses</CardTitle>
           <ProjectionChart
-            months={[{ month, expectedCents: data.expectedCents }, ...data.projection]}
+            months={[
+              {
+                month,
+                expectedCents: data.expectedCents,
+                segments: toSegments(data.byPaymentMethod),
+              },
+              ...data.projection.map((m) => ({
+                month: m.month,
+                expectedCents: m.expectedCents,
+                segments: toSegments(m.byPaymentMethod),
+              })),
+            ]}
           />
         </Card>
 
