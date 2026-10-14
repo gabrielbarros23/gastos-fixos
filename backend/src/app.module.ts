@@ -5,6 +5,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module.js';
 import { CategoriesModule } from './categories/categories.module.js';
+import { PaymentMethodsModule } from './payment-methods/payment-methods.module.js';
 import { ClockModule } from './common/clock/clock.module.js';
 import { NodeEnv, validateEnv, type Env } from './config/env.validation.js';
 import { ExpensesModule } from './expenses/expenses.module.js';
@@ -47,6 +48,7 @@ import { UsersModule } from './users/users.module.js';
     UsersModule,
     AuthModule,
     CategoriesModule,
+    PaymentMethodsModule,
     ExpensesModule,
     OccurrencesModule,
     PaymentsModule,
