@@ -104,6 +104,7 @@ describe('Formas de pagamento (e2e)', () => {
           color: '#8A05BE',
           closingDay: null,
           dueDay: null,
+          lastDigits: null,
           expenseCount: 0,
         },
         {
@@ -113,6 +114,7 @@ describe('Formas de pagamento (e2e)', () => {
           color: '#8A05BE',
           closingDay: 25,
           dueDay: 5,
+          lastDigits: null,
           expenseCount: 1,
         },
       ]);
@@ -149,6 +151,57 @@ describe('Formas de pagamento (e2e)', () => {
           dueDay: 0,
         })
         .expect(400);
+    });
+
+    it('últimos 4 dígitos: opcionais, só em cartão, e somem ao deixar de ser cartão', async () => {
+      const debit = await createMethod({
+        name: 'Débito Itaú',
+        type: 'DEBIT_CARD',
+        lastDigits: ' 4821 ',
+      });
+      expect(debit).toMatchObject({ lastDigits: '4821' });
+
+      // Formato inválido e forma que não é cartão
+      await api()
+        .post('/api/payment-methods')
+        .set(authHeader(user))
+        .send({
+          name: 'X',
+          type: 'DEBIT_CARD',
+          color: '#000000',
+          lastDigits: '48',
+        })
+        .expect(400);
+      const pixWithDigits = await api()
+        .post('/api/payment-methods')
+        .set(authHeader(user))
+        .send({
+          name: 'Pix',
+          type: 'PIX',
+          color: '#000000',
+          lastDigits: '1234',
+        })
+        .expect(400);
+      expect(pixWithDigits.body.details[0].field).toBe('lastDigits');
+
+      // Texto vazio apaga; virar Pix também apaga
+      const cleared = await api()
+        .patch(`/api/payment-methods/${debit.id}`)
+        .set(authHeader(user))
+        .send({ lastDigits: '' })
+        .expect(200);
+      expect(cleared.body.lastDigits).toBeNull();
+      await api()
+        .patch(`/api/payment-methods/${debit.id}`)
+        .set(authHeader(user))
+        .send({ lastDigits: '9090' })
+        .expect(200);
+      const pix = await api()
+        .patch(`/api/payment-methods/${debit.id}`)
+        .set(authHeader(user))
+        .send({ type: 'PIX' })
+        .expect(200);
+      expect(pix.body.lastDigits).toBeNull();
     });
 
     it('nome único por usuário, sem diferenciar maiúsculas (409)', async () => {

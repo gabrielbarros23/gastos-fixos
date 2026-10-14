@@ -14,7 +14,7 @@ import {
   HEX_COLOR,
   NormalizeColor,
 } from '../../categories/dto/create-category.dto.js';
-import { Trim } from '../../common/validation/transformers.js';
+import { Trim, TrimToNull } from '../../common/validation/transformers.js';
 import type { PaymentMethodType } from '../../generated/prisma/enums.js';
 
 export const PAYMENT_METHOD_TYPES = [
@@ -34,6 +34,23 @@ export const IsDayOfMonth = (field: string) =>
     IsInt({ message: `${field} deve ser um número inteiro` }),
     Min(1, { message: `${field} deve estar entre 1 e 31` }),
     Max(31, { message: `${field} deve estar entre 1 e 31` }),
+  );
+
+/** Tipos que são cartão (têm número impresso). */
+export const CARD_TYPES: readonly PaymentMethodType[] = [
+  'CREDIT_CARD',
+  'DEBIT_CARD',
+];
+
+/** Opcional: os 4 últimos dígitos do cartão. Texto vazio vira null. */
+export const IsLastDigits = () =>
+  applyDecorators(
+    IsOptional(),
+    TrimToNull(),
+    IsString(),
+    Matches(/^\d{4}$/, {
+      message: 'Informe os 4 últimos dígitos do cartão',
+    }),
   );
 
 export class CreatePaymentMethodDto {
@@ -62,4 +79,8 @@ export class CreatePaymentMethodDto {
   @IsOptional()
   @IsDayOfMonth('dueDay')
   dueDay?: number | null;
+
+  /** Só cartões (opcional): 4 últimos dígitos, para diferenciar cartões. @example "4821" */
+  @IsLastDigits()
+  lastDigits?: string | null;
 }

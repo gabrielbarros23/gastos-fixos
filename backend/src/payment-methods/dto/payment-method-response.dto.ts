@@ -14,6 +14,8 @@ export class PaymentMethodRefDto {
   type: PaymentMethodType;
   /** @example "#8A05BE" */
   color: string;
+  /** 4 últimos dígitos do cartão, se informados @example "4821" */
+  lastDigits: string | null;
 
   static from(method: PaymentMethod): PaymentMethodRefDto {
     return {
@@ -21,6 +23,7 @@ export class PaymentMethodRefDto {
       name: method.name,
       type: method.type,
       color: method.color,
+      lastDigits: method.lastDigits,
     };
   }
 }

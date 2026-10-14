@@ -43,6 +43,7 @@ const PAYMENT_METHODS = [
     color: '#8A05BE',
     closingDay: 25,
     dueDay: 5,
+    lastDigits: '4821',
   },
   // Fecha dia 3 e vence dia 10 do mesmo mês.
   {
@@ -51,6 +52,7 @@ const PAYMENT_METHODS = [
     color: '#11C76F',
     closingDay: 3,
     dueDay: 10,
+    lastDigits: '0937',
   },
   { name: 'C6 Pix automático', type: 'PIX', color: '#0EA5E9' },
   { name: 'Débito automático Itaú', type: 'ACCOUNT_DEBIT', color: '#EC7000' },

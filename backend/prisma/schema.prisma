@@ -94,6 +94,9 @@ model PaymentMethod {
   // Só cartão de crédito (CHECK no banco): definem em qual fatura cada cobrança entra.
   closingDay Int?              @map("closing_day")
   dueDay     Int?              @map("due_day")
+  // Só cartões (crédito ou débito), opcional: os 4 últimos dígitos, para o
+  // usuário diferenciar cartões. Nunca o número inteiro.
+  lastDigits String?           @map("last_digits")
   createdAt  DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt  DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
 

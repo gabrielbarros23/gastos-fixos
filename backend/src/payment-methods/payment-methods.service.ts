@@ -14,7 +14,10 @@ import {
   isUniqueViolation,
 } from '../prisma/prisma-errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { CreatePaymentMethodDto } from './dto/create-payment-method.dto.js';
+import {
+  CARD_TYPES,
+  CreatePaymentMethodDto,
+} from './dto/create-payment-method.dto.js';
 import { PaymentMethodResponseDto } from './dto/payment-method-response.dto.js';
 import { UpdatePaymentMethodDto } from './dto/update-payment-method.dto.js';
 
@@ -51,6 +54,20 @@ function resolveCycle(
   return { closingDay: null, dueDay: null };
 }
 
+/** Os 4 últimos dígitos só fazem sentido em cartão (crédito ou débito). */
+function resolveLastDigits(
+  type: PaymentMethodType,
+  lastDigits: string | null,
+): string | null {
+  if (lastDigits !== null && !CARD_TYPES.includes(type)) {
+    throw fieldError(
+      'lastDigits',
+      'Os últimos dígitos só valem para cartão de crédito ou débito',
+    );
+  }
+  return lastDigits;
+}
+
 @Injectable()
 export class PaymentMethodsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -77,6 +94,7 @@ export class PaymentMethodsService {
       dto.closingDay ?? null,
       dto.dueDay ?? null,
     );
+    const lastDigits = resolveLastDigits(dto.type, dto.lastDigits ?? null);
     try {
       const method = await this.prisma.paymentMethod.create({
         data: {
@@ -85,6 +103,7 @@ export class PaymentMethodsService {
           type: dto.type,
           color: dto.color,
           ...cycle,
+          lastDigits,
         },
       });
       return PaymentMethodResponseDto.from(method);
@@ -102,7 +121,8 @@ export class PaymentMethodsService {
     const current = await this.findOwned(userId, id);
     const type = dto.type ?? current.type;
     // Continua (ou vira) cartão: o que não veio na requisição fica como estava.
-    // Deixa de ser cartão: os dias somem, a menos que a requisição insista neles.
+    // Deixa de ser cartão: os dias (e os últimos dígitos) somem, a menos que a
+    // requisição insista neles.
     const keepCurrent = type === 'CREDIT_CARD';
     const cycle = resolveCycle(
       type,
@@ -117,11 +137,25 @@ export class PaymentMethodsService {
           ? current.dueDay
           : null,
     );
+    const lastDigits = resolveLastDigits(
+      type,
+      dto.lastDigits !== undefined
+        ? dto.lastDigits
+        : CARD_TYPES.includes(type)
+          ? current.lastDigits
+          : null,
+    );
 
     try {
       const method = await this.prisma.paymentMethod.update({
         where: { id },
-        data: { name: dto.name, color: dto.color, type, ...cycle },
+        data: {
+          name: dto.name,
+          color: dto.color,
+          type,
+          ...cycle,
+          lastDigits,
+        },
       });
       const counts = await this.expenseCounts({ paymentMethodId: id });
       return PaymentMethodResponseDto.from(method, counts.get(id));

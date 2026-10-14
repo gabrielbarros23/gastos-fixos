@@ -1057,12 +1057,12 @@
       "_type": "request",
       "parentId": "fld_gastos_10",
       "name": "Criar cartão de crédito",
-      "description": "Cartão de crédito exige `closingDay` (fechamento) e `dueDay` (vencimento da fatura). Uma cobrança antes do fechamento entra na fatura daquele mês; no dia do fechamento ou depois, na seguinte.\n\nTipos: `CREDIT_CARD`, `DEBIT_CARD`, `PIX`, `BOLETO`, `ACCOUNT_DEBIT` e `OTHER`. Nome único por usuário (409). Salva o id em `payment_method_id`.",
+      "description": "Cartão de crédito exige `closingDay` (fechamento) e `dueDay` (vencimento da fatura). Uma cobrança antes do fechamento entra na fatura daquele mês; no dia do fechamento ou depois, na seguinte.\n\nTipos: `CREDIT_CARD`, `DEBIT_CARD`, `PIX`, `BOLETO`, `ACCOUNT_DEBIT` e `OTHER`. `lastDigits` (opcional, só cartões de crédito ou débito): os 4 últimos dígitos, para diferenciar cartões. Nome único por usuário (409). Salva o id em `payment_method_id`.",
       "url": "{{ _.base_url }}/payment-methods",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"name\": \"Cartão Inter\",\n  \"type\": \"CREDIT_CARD\",\n  \"color\": \"#FF7A00\",\n  \"closingDay\": 15,\n  \"dueDay\": 22\n}"
+        "text": "{\n  \"name\": \"Cartão Inter\",\n  \"type\": \"CREDIT_CARD\",\n  \"color\": \"#FF7A00\",\n  \"closingDay\": 15,\n  \"dueDay\": 22,\n  \"lastDigits\": \"1234\"\n}"
       },
       "parameters": [],
       "headers": [

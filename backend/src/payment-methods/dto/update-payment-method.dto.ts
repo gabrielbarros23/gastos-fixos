@@ -9,6 +9,7 @@ import { Trim } from '../../common/validation/transformers.js';
 import type { PaymentMethodType } from '../../generated/prisma/enums.js';
 import {
   IsDayOfMonth,
+  IsLastDigits,
   PAYMENT_METHOD_TYPES,
   TYPE_MESSAGE,
 } from './create-payment-method.dto.js';
@@ -46,4 +47,8 @@ export class UpdatePaymentMethodDto {
   @IsOptional()
   @IsDayOfMonth('dueDay')
   dueDay?: number | null;
+
+  /** null ou "" apaga. @example "4821" */
+  @IsLastDigits()
+  lastDigits?: string | null;
 }
