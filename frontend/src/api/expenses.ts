@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import { invalidateFinancialData, queryKeys } from './query-keys';
-import type { Amount, Expense, ExpenseDetail, Frequency } from './types';
+import type { Amount, Expense, ExpenseDetail, ExpensePaymentMethod, Frequency } from './types';
 
 export type ExpenseStatusFilter = 'all' | 'active' | 'inactive';
 
@@ -23,6 +23,8 @@ export interface ExpenseRuleInput {
 
 export interface CreateExpenseInput extends ExpenseRuleInput {
   amountCents: number;
+  /** Forma de pagamento desde o início (opcional) */
+  paymentMethodId: string | null;
 }
 
 export function useExpenses(filters: ExpenseFilters) {
@@ -109,5 +111,48 @@ export function useCorrectAmount() {
 export function useRemoveAmount() {
   return useFinancialMutation(({ expenseId, amountId }: { expenseId: string; amountId: string }) =>
     api.delete(`/expenses/${expenseId}/amounts/${amountId}`),
+  );
+}
+
+/** Troca a forma de pagamento a partir de uma data (null = sem forma). */
+export function useAddExpensePaymentMethod() {
+  return useFinancialMutation(
+    async ({
+      expenseId,
+      ...input
+    }: {
+      expenseId: string;
+      paymentMethodId: string | null;
+      effectiveFrom: string;
+    }) =>
+      (await api.post<ExpensePaymentMethod>(`/expenses/${expenseId}/payment-methods`, input)).data,
+  );
+}
+
+/** Corrige um registro do histórico (muda também o período passado). */
+export function useCorrectExpensePaymentMethod() {
+  return useFinancialMutation(
+    async ({
+      expenseId,
+      assignmentId,
+      paymentMethodId,
+    }: {
+      expenseId: string;
+      assignmentId: string;
+      paymentMethodId: string | null;
+    }) =>
+      (
+        await api.patch<ExpensePaymentMethod>(
+          `/expenses/${expenseId}/payment-methods/${assignmentId}`,
+          { paymentMethodId },
+        )
+      ).data,
+  );
+}
+
+export function useRemoveExpensePaymentMethod() {
+  return useFinancialMutation(
+    ({ expenseId, assignmentId }: { expenseId: string; assignmentId: string }) =>
+      api.delete(`/expenses/${expenseId}/payment-methods/${assignmentId}`),
   );
 }

@@ -214,6 +214,7 @@ export function ExpensesPage() {
                   <p>
                     {expense.category.name} · {describeRecurrence(expense)}
                     {end && ` · ${end}`}
+                    {expense.paymentMethod && ` · ${expense.paymentMethod.name}`}
                   </p>
                 </Main>
                 <Money>

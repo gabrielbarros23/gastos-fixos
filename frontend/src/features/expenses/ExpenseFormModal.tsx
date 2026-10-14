@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { Link } from 'react-router';
 import styled from 'styled-components';
@@ -12,7 +12,7 @@ import {
   useUpdateExpense,
   type ExpenseRuleInput,
 } from '../../api/expenses';
-import type { Expense, Frequency } from '../../api/types';
+import type { Expense, ExpenseDetail, Frequency } from '../../api/types';
 import { Button } from '../../components/ui/Button';
 import {
   Field,
@@ -31,7 +31,19 @@ import { useToast } from '../../components/ui/Toast';
 import { todayIso } from '../../lib/dates';
 import { MAX_AMOUNT_CENTS } from '../../lib/money';
 import { FREQUENCY_UNIT } from '../../lib/recurrence-label';
+import { usePaymentMethods } from '../../api/payment-methods';
 import { AmountHistory } from './AmountHistory';
+import { PaymentMethodHistory, PaymentMethodOptions } from './PaymentMethodHistory';
+
+/** Conteúdo que depende do detalhe do gasto: carregando, erro ou pronto. */
+function detailContent(
+  detail: ReturnType<typeof useExpense>,
+  render: (expense: ExpenseDetail) => ReactNode,
+) {
+  if (detail.data) return render(detail.data);
+  if (detail.isError) return <FormError>{errorMessage(detail.error)}</FormError>;
+  return <CenteredSpinner />;
+}
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Informe uma data válida');
 
@@ -40,6 +52,8 @@ const schema = z
     name: z.string().trim().min(1, 'Informe o nome').max(100, 'Máximo de 100 caracteres'),
     description: z.string().trim().max(500, 'Máximo de 500 caracteres'),
     categoryId: z.string().min(1, 'Escolha uma categoria'),
+    // Vazio = sem forma de pagamento. Só é usado na criação.
+    paymentMethodId: z.string(),
     amountCents: z
       .number()
       .int()
@@ -89,6 +103,7 @@ const SERVER_FIELDS = [
   'name',
   'description',
   'categoryId',
+  'paymentMethodId',
   'amountCents',
   'frequency',
   'interval',
@@ -142,6 +157,7 @@ function defaultsFor(expense?: Expense): ExpenseForm {
       name: '',
       description: '',
       categoryId: '',
+      paymentMethodId: '',
       amountCents: 0,
       frequency: 'MONTHLY',
       interval: 1,
@@ -160,6 +176,7 @@ function defaultsFor(expense?: Expense): ExpenseForm {
     name: expense.name,
     description: expense.description ?? '',
     categoryId: expense.category.id,
+    paymentMethodId: expense.paymentMethod?.id ?? '',
     amountCents: expense.currentAmountCents,
     frequency: expense.frequency,
     interval: expense.interval,
@@ -206,6 +223,7 @@ export function ExpenseFormModal({ open, expense, onClose }: ExpenseFormModalPro
 function ExpenseFormContent({ expense, onClose }: Omit<ExpenseFormModalProps, 'open'>) {
   const toast = useToast();
   const categories = useCategories();
+  const paymentMethods = usePaymentMethods();
   const createExpense = useCreateExpense();
   const updateExpense = useUpdateExpense();
   // No modo edição, o detalhe traz o histórico de valores.
@@ -239,6 +257,7 @@ function ExpenseFormContent({ expense, onClose }: Omit<ExpenseFormModalProps, 'o
         await createExpense.mutateAsync({
           ...toRuleInput(values),
           amountCents: values.amountCents,
+          paymentMethodId: values.paymentMethodId || null,
         });
         toast.success('Gasto cadastrado');
       }
@@ -305,6 +324,23 @@ function ExpenseFormContent({ expense, onClose }: Omit<ExpenseFormModalProps, 'o
             </Field>
           )}
         </FieldRow>
+        {!expense && (
+          <Field
+            label="Forma de pagamento (opcional)"
+            error={errors.paymentMethodId?.message}
+            hint={
+              paymentMethods.data?.length === 0
+                ? 'Cadastre seus cartões e contas em Carteira'
+                : 'Cartão de crédito entra no mês em que a fatura vence'
+            }
+          >
+            {(a11y) => (
+              <Select {...a11y} {...register('paymentMethodId')}>
+                <PaymentMethodOptions methods={paymentMethods.data ?? []} />
+              </Select>
+            )}
+          </Field>
+        )}
         <Field label="Descrição (opcional)" error={errors.description?.message}>
           {(a11y) => <Textarea {...a11y} rows={2} {...register('description')} />}
         </Field>
@@ -435,13 +471,16 @@ function ExpenseFormContent({ expense, onClose }: Omit<ExpenseFormModalProps, 'o
       <Divider />
       <Section as="section">
         <SectionTitle>Valor e histórico de preço</SectionTitle>
-        {detail.data ? (
-          <AmountHistory expense={detail.data} />
-        ) : detail.isError ? (
-          <FormError>{errorMessage(detail.error)}</FormError>
-        ) : (
-          <CenteredSpinner />
-        )}
+        {detailContent(detail, (data) => (
+          <AmountHistory expense={data} />
+        ))}
+      </Section>
+      <Divider />
+      <Section as="section">
+        <SectionTitle>Forma de pagamento</SectionTitle>
+        {detailContent(detail, (data) => (
+          <PaymentMethodHistory expense={data} />
+        ))}
       </Section>
     </Stack>
   ) : (
