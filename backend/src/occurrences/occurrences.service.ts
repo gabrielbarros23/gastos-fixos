@@ -13,7 +13,14 @@ import {
   occurrencesWithPayments,
   totalsOf,
 } from '../domain/occurrences.js';
-import { toSchedule } from '../expenses/expense-schedule.js';
+import { MAX_BILLING_DELAY_MONTHS } from '../domain/credit-card.js';
+import {
+  addMonthsToYearMonth,
+  firstDayOf,
+  lastDayOf,
+  type YearMonth,
+} from '../domain/year-month.js';
+import { EXPENSE_INCLUDE, toSchedule } from '../expenses/expense-schedule.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { OccurrenceResponseDto } from './dto/occurrence-response.dto.js';
 import {
@@ -22,6 +29,7 @@ import {
 } from './dto/occurrences-query.dto.js';
 import { OccurrencesResponseDto } from './dto/occurrences-response.dto.js';
 import {
+  toExpenseOccurrence,
   toPaymentRecord,
   type ExpenseOccurrence,
 } from './occurrence-source.js';
@@ -54,11 +62,18 @@ export class OccurrencesService {
     }
 
     const today = this.clock.today();
-    const occurrences = (await this.findInPeriod(userId, from, to)).sort(
-      (a, b) =>
-        compareDates(a.dueDate, b.dueDate) ||
-        a.expense.name.localeCompare(b.expense.name, 'pt-BR'),
-    );
+    const inPeriod = await this.findInPeriod(userId, from, to);
+    const occurrences = inPeriod
+      .filter(
+        (o) =>
+          !query.paymentMethodId ||
+          o.paymentMethod?.id === query.paymentMethodId,
+      )
+      .sort(
+        (a, b) =>
+          compareDates(a.dueDate, b.dueDate) ||
+          a.expense.name.localeCompare(b.expense.name, 'pt-BR'),
+      );
     const periodTotals = totalsOf(occurrences, today);
 
     return {
@@ -114,8 +129,7 @@ export class OccurrencesService {
         ],
       },
       include: {
-        category: true,
-        amounts: { orderBy: { effectiveFrom: 'asc' } },
+        ...EXPENSE_INCLUDE,
         payments: { where: { dueDate: dueInPeriod } },
       },
     });
@@ -126,7 +140,27 @@ export class OccurrencesService {
         expense.payments.map(toPaymentRecord),
         from,
         to,
-      ).map((occurrence) => ({ ...occurrence, expense })),
+      ).map((occurrence) => toExpenseOccurrence(occurrence, expense)),
+    );
+  }
+
+  /**
+   * Ocorrências que PESAM nos meses de `first` a `last`: no cartão de crédito,
+   * as que entram nas faturas que vencem nesses meses (mesmo que a cobrança
+   * tenha sido antes); nas outras formas, as que vencem nesses meses.
+   */
+  async findBilledIn(
+    userId: string,
+    first: YearMonth,
+    last: YearMonth,
+  ): Promise<ExpenseOccurrence[]> {
+    const charges = await this.findInPeriod(
+      userId,
+      firstDayOf(addMonthsToYearMonth(first, -MAX_BILLING_DELAY_MONTHS)),
+      lastDayOf(last),
+    );
+    return charges.filter(
+      ({ billing }) => billing.month >= first && billing.month <= last,
     );
   }
 }

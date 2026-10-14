@@ -11,7 +11,12 @@ import {
   type Frequency,
 } from '../../domain/recurrence.js';
 import type { ExpenseAmount } from '../../generated/prisma/client.js';
-import { toSchedule, type ExpenseWithRelations } from '../expense-schedule.js';
+import { PaymentMethodRefDto } from '../../payment-methods/dto/payment-method-response.dto.js';
+import {
+  paymentMethodAt,
+  toSchedule,
+  type ExpenseWithRelations,
+} from '../expense-schedule.js';
 
 export class ExpenseCategoryDto {
   id: string;
@@ -36,6 +41,26 @@ export class AmountResponseDto {
   }
 }
 
+export class ExpensePaymentMethodResponseDto {
+  id: string;
+  /** null = sem forma de pagamento a partir de effectiveFrom */
+  paymentMethod: PaymentMethodRefDto | null;
+  /** @example "2026-06-10" */
+  effectiveFrom: string;
+
+  static from(
+    assignment: ExpenseWithRelations['paymentMethods'][number],
+  ): ExpensePaymentMethodResponseDto {
+    return {
+      id: assignment.id,
+      paymentMethod:
+        assignment.paymentMethod &&
+        PaymentMethodRefDto.from(assignment.paymentMethod),
+      effectiveFrom: fromDbDate(assignment.effectiveFrom),
+    };
+  }
+}
+
 export class ExpenseResponseDto {
   id: string;
   name: string;
@@ -56,6 +81,8 @@ export class ExpenseResponseDto {
   currentAmountCents: number;
   /** Próximo vencimento a partir de hoje, ou null se a série acabou */
   nextDueDate: string | null;
+  /** Forma de pagamento vigente hoje (ou a inicial, se ainda não começou) */
+  paymentMethod: PaymentMethodRefDto | null;
   createdAt: Date;
   updatedAt: Date;
 
@@ -64,6 +91,10 @@ export class ExpenseResponseDto {
     today: CalendarDate,
   ): ExpenseResponseDto {
     const schedule = toSchedule(expense);
+    const currentMethod = paymentMethodAt(
+      expense,
+      maxDate(today, schedule.startDate),
+    );
     return {
       id: expense.id,
       name: expense.name,
@@ -87,6 +118,7 @@ export class ExpenseResponseDto {
         maxDate(today, schedule.startDate),
       )!,
       nextDueDate: nextOccurrence(schedule, today)?.date ?? null,
+      paymentMethod: currentMethod && PaymentMethodRefDto.from(currentMethod),
       createdAt: expense.createdAt,
       updatedAt: expense.updatedAt,
     };
@@ -96,6 +128,8 @@ export class ExpenseResponseDto {
 export class ExpenseDetailResponseDto extends ExpenseResponseDto {
   /** Histórico de valores, do mais antigo para o mais recente */
   amounts: AmountResponseDto[];
+  /** Histórico da forma de pagamento, do mais antigo para o mais recente */
+  paymentMethods: ExpensePaymentMethodResponseDto[];
 
   static override from(
     expense: ExpenseWithRelations,
@@ -104,6 +138,9 @@ export class ExpenseDetailResponseDto extends ExpenseResponseDto {
     return {
       ...ExpenseResponseDto.from(expense, today),
       amounts: expense.amounts.map((amount) => AmountResponseDto.from(amount)),
+      paymentMethods: expense.paymentMethods.map((assignment) =>
+        ExpensePaymentMethodResponseDto.from(assignment),
+      ),
     };
   }
 }

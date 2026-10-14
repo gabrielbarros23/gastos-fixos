@@ -36,6 +36,14 @@ export class CreateExpenseDto {
   @IsUUID('all', { message: 'categoryId deve ser um UUID' })
   categoryId: string;
 
+  /**
+   * Forma de pagamento (opcional), vigente desde o startDate. Para trocar
+   * depois, use POST /expenses/:id/payment-methods.
+   */
+  @IsOptional()
+  @IsUUID('all', { message: 'paymentMethodId deve ser um UUID' })
+  paymentMethodId?: string | null;
+
   /** Valor inicial, vigente a partir do startDate */
   @IsAmountCents()
   amountCents: number;

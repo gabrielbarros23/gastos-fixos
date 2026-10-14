@@ -14,6 +14,7 @@ import {
   type Frequency,
 } from '../domain/recurrence.js';
 import type { Prisma } from '../generated/prisma/client.js';
+import { PaymentMethodsService } from '../payment-methods/payment-methods.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateExpenseDto } from './dto/create-expense.dto.js';
 import {
@@ -46,6 +47,7 @@ export class ExpensesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly categories: CategoriesService,
+    private readonly paymentMethods: PaymentMethodsService,
     private readonly clock: Clock,
   ) {}
 
@@ -76,6 +78,9 @@ export class ExpensesService {
     dto: CreateExpenseDto,
   ): Promise<ExpenseDetailResponseDto> {
     await this.categories.assertOwned(userId, dto.categoryId);
+    if (dto.paymentMethodId) {
+      await this.paymentMethods.findOwned(userId, dto.paymentMethodId);
+    }
 
     const startDate = parseCalendarDate(dto.startDate);
     const end = this.resolveEnd({
@@ -104,6 +109,14 @@ export class ExpensesService {
             effectiveFrom: toDbDate(startDate),
           },
         },
+        paymentMethods: dto.paymentMethodId
+          ? {
+              create: {
+                paymentMethodId: dto.paymentMethodId,
+                effectiveFrom: toDbDate(startDate),
+              },
+            }
+          : undefined,
       },
       include: EXPENSE_INCLUDE,
     });
@@ -162,12 +175,30 @@ export class ExpensesService {
       );
     }
 
-    const [, updated] = await this.prisma.$transaction([
-      this.prisma.expenseAmount.update({
+    // A forma de pagamento escolhida desde o início também acompanha o início,
+    // senão os novos primeiros vencimentos ficariam "sem forma de pagamento".
+    // Se ela foi definida depois do início, ou se mover passaria da troca
+    // seguinte, o histórico fica como está.
+    const [firstMethod, secondMethod] = current.paymentMethods;
+    const moveFirstMethod =
+      startChanged &&
+      firstMethod !== undefined &&
+      fromDbDate(firstMethod.effectiveFrom) === currentStart &&
+      (!secondMethod ||
+        compareDates(startDate, fromDbDate(secondMethod.effectiveFrom)) < 0);
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.expenseAmount.update({
         where: { id: initialAmount.id },
         data: { effectiveFrom: toDbDate(startDate) },
-      }),
-      this.prisma.expense.update({
+      });
+      if (moveFirstMethod) {
+        await tx.expensePaymentMethod.update({
+          where: { id: firstMethod.id },
+          data: { effectiveFrom: toDbDate(startDate) },
+        });
+      }
+      return tx.expense.update({
         where: { id },
         data: {
           name: dto.name,
@@ -180,8 +211,8 @@ export class ExpensesService {
           installmentCount: end.installmentCount,
         },
         include: EXPENSE_INCLUDE,
-      }),
-    ]);
+      });
+    });
     return this.toDetail(updated);
   }
 

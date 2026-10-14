@@ -13,7 +13,10 @@ import { isOccurrenceDate } from '../domain/recurrence.js';
 import { toSchedule } from '../expenses/expense-schedule.js';
 import { ExpensesService } from '../expenses/expenses.service.js';
 import { OccurrenceResponseDto } from '../occurrences/dto/occurrence-response.dto.js';
-import { toPaymentRecord } from '../occurrences/occurrence-source.js';
+import {
+  toExpenseOccurrence,
+  toPaymentRecord,
+} from '../occurrences/occurrence-source.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MarkPaidDto } from './dto/mark-paid.dto.js';
 
@@ -75,7 +78,10 @@ export class PaymentsService {
       dueDate,
       dueDate,
     );
-    return OccurrenceResponseDto.from({ ...occurrence, expense }, today);
+    return OccurrenceResponseDto.from(
+      toExpenseOccurrence(occurrence, expense),
+      today,
+    );
   }
 
   /** Desmarca: a ocorrência volta a ser só calculada. Idempotente. */

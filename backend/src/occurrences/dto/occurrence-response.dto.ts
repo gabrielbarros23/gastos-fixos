@@ -5,6 +5,7 @@ import {
   type OccurrenceStatus,
 } from '../../domain/occurrences.js';
 import { ExpenseCategoryDto } from '../../expenses/dto/expense-response.dto.js';
+import { PaymentMethodRefDto } from '../../payment-methods/dto/payment-method-response.dto.js';
 import type { ExpenseOccurrence } from '../occurrence-source.js';
 
 const STATUSES: OccurrenceStatus[] = ['PAID', 'PENDING', 'OVERDUE'];
@@ -14,6 +15,13 @@ export class InstallmentDto {
   number: number;
   /** @example 12 */
   total: number;
+}
+
+export class InvoiceDto {
+  /** Dia em que a fatura fecha. @example "2026-10-25" */
+  closingDate: string;
+  /** Dia em que a fatura vence. @example "2026-11-05" */
+  dueDate: string;
 }
 
 export class PaymentDto {
@@ -42,6 +50,15 @@ export class OccurrenceResponseDto {
   @ApiProperty({ enum: STATUSES })
   status: OccurrenceStatus;
   payment: PaymentDto | null;
+  /** Forma de pagamento vigente na data do vencimento */
+  paymentMethod: PaymentMethodRefDto | null;
+  /**
+   * Mês em que a cobrança pesa no resumo. No cartão de crédito, o mês em que a
+   * fatura vence; nas outras formas, o mês do vencimento. @example "2026-11"
+   */
+  billingMonth: string;
+  /** Fatura em que a cobrança entra (só cartão de crédito) */
+  invoice: InvoiceDto | null;
 
   static from(
     occurrence: ExpenseOccurrence,
@@ -64,6 +81,11 @@ export class OccurrenceResponseDto {
         paidAmountCents: occurrence.payment.paidAmountCents,
         paidAt: occurrence.payment.paidAt,
       },
+      paymentMethod:
+        occurrence.paymentMethod &&
+        PaymentMethodRefDto.from(occurrence.paymentMethod),
+      billingMonth: occurrence.billing.month,
+      invoice: occurrence.billing.invoice,
     };
   }
 }
