@@ -1,0 +1,1314 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-10-14T00:33:11.787Z",
+  "resources": [
+    {
+      "_id": "wrk_gastos_01",
+      "_type": "workspace",
+      "parentId": null,
+      "name": "Gastos Fixos API",
+      "description": "Coleção da API do **Controle de Gastos Fixos**.\n\n1. Suba o projeto (Docker, `npm run start:dev` no backend) e rode o seed (`npm run db:seed`).\n2. Rode **Auth → Login**: o access token é salvo sozinho no ambiente.\n3. Siga as pastas de cima para baixo. As requisições que criam algo salvam o id no ambiente para as próximas.\n\nO access token vale 15 min. Quando as rotas começarem a dar 401, rode **Auth → Refresh**.",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_gastos_01",
+      "_type": "environment",
+      "parentId": "wrk_gastos_01",
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:3000/api",
+        "email": "demo@gastos.dev",
+        "password": "demo12345",
+        "start_date": "2026-10-10",
+        "from": "2026-10-01",
+        "to": "2026-10-31",
+        "month": "2026-10",
+        "access_token": "",
+        "category_id": "rode-listar-categorias",
+        "new_category_id": "rode-criar-categoria",
+        "payment_method_id": "rode-criar-cartao",
+        "pix_method_id": "rode-criar-pix",
+        "assignment_id": "rode-trocar-forma",
+        "expense_id": "rode-criar-gasto-mensal",
+        "amount_id": "rode-registrar-reajuste"
+      },
+      "dataPropertyOrder": {
+        "&": [
+          "base_url",
+          "email",
+          "password",
+          "start_date",
+          "from",
+          "to",
+          "month",
+          "access_token",
+          "category_id",
+          "new_category_id",
+          "payment_method_id",
+          "pix_method_id",
+          "assignment_id",
+          "expense_id",
+          "amount_id"
+        ]
+      },
+      "color": null,
+      "isPrivate": false,
+      "metaSortKey": 1
+    },
+    {
+      "_id": "fld_gastos_01",
+      "_type": "request_group",
+      "parentId": "wrk_gastos_01",
+      "name": "Infra",
+      "description": "Rotas públicas de infraestrutura.",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 100
+    },
+    {
+      "_id": "req_gastos_001",
+      "_type": "request",
+      "parentId": "fld_gastos_01",
+      "name": "Health",
+      "description": "Verifica se a API está no ar e consegue falar com o banco. Pública (sem token); responde 503 se o Postgres estiver fora.",
+      "url": "{{ _.base_url }}/health",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "none"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 100,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "fld_gastos_02",
+      "_type": "request_group",
+      "parentId": "wrk_gastos_01",
+      "name": "Auth",
+      "description": "Access token (JWT, 15 min) no corpo da resposta; refresh token (7 dias) num cookie `httpOnly`, guardado pelo Cookie Jar do Insomnia.",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 200
+    },
+    {
+      "_id": "req_gastos_002",
+      "_type": "request",
+      "parentId": "fld_gastos_02",
+      "name": "Login",
+      "description": "Entra com a conta do ambiente (`email` e `password`; por padrão, a conta demo do seed).\n\nO **access token** vem no corpo e é salvo sozinho no ambiente. O **refresh token** vem num cookie `httpOnly`, que o Cookie Jar do Insomnia guarda e envia no **Refresh**.\n\nE-mail inexistente e senha errada dão o mesmo 401. Limite de 5 tentativas por minuto (depois, 429).",
+      "url": "{{ _.base_url }}/auth/login",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"{{ _.email }}\",\n  \"password\": \"{{ _.password }}\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "none"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "// Salva o access token no ambiente: as rotas protegidas usam {{ _.access_token }}.\nif (insomnia.response.code === 200 || insomnia.response.code === 201) {\n  insomnia.baseEnvironment.set('access_token', insomnia.response.json().accessToken);\n}",
+      "metaSortKey": 100,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_003",
+      "_type": "request",
+      "parentId": "fld_gastos_02",
+      "name": "Cadastrar",
+      "description": "Cria a conta (com 5 categorias padrão) e já inicia a sessão: o token salvo passa a ser o do novo usuário.\n\nRodar de novo devolve **409** (e-mail já cadastrado): troque o e-mail no corpo. Para voltar à conta demo, rode **Login**.",
+      "url": "{{ _.base_url }}/auth/register",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Novo Usuário\",\n  \"email\": \"novo@gastos.dev\",\n  \"password\": \"senha-forte-123\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "none"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "// Salva o access token no ambiente: as rotas protegidas usam {{ _.access_token }}.\nif (insomnia.response.code === 200 || insomnia.response.code === 201) {\n  insomnia.baseEnvironment.set('access_token', insomnia.response.json().accessToken);\n}",
+      "metaSortKey": 200,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_004",
+      "_type": "request",
+      "parentId": "fld_gastos_02",
+      "name": "Refresh",
+      "description": "Troca o refresh token (cookie) por um access token novo **e** um refresh token novo (rotação). Use quando as outras rotas começarem a dar 401: o access token vale 15 min.\n\nPara ver a detecção de reuso: em *Manage Cookies*, copie o valor de `refresh_token`, rode Refresh (o valor muda), cole o valor antigo de volta e rode de novo. Resultado: 401, e a sessão inteira (a família de tokens) é revogada, inclusive o token mais novo.",
+      "url": "{{ _.base_url }}/auth/refresh",
+      "method": "POST",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "none"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "// Salva o access token no ambiente: as rotas protegidas usam {{ _.access_token }}.\nif (insomnia.response.code === 200 || insomnia.response.code === 201) {\n  insomnia.baseEnvironment.set('access_token', insomnia.response.json().accessToken);\n}",
+      "metaSortKey": 300,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_005",
+      "_type": "request",
+      "parentId": "fld_gastos_02",
+      "name": "Logout",
+      "description": "Revoga a sessão (a família do refresh token) e apaga o cookie. Depois disso, **Refresh** dá 401.\n\nO access token já emitido continua válido até expirar (no máximo 15 min): um JWT não pode ser revogado, por isso ele dura pouco.",
+      "url": "{{ _.base_url }}/auth/logout",
+      "method": "POST",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "none"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 400,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "fld_gastos_03",
+      "_type": "request_group",
+      "parentId": "wrk_gastos_01",
+      "name": "Usuário",
+      "description": "Dados e preferências do usuário logado.",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 300
+    },
+    {
+      "_id": "req_gastos_006",
+      "_type": "request",
+      "parentId": "fld_gastos_03",
+      "name": "Meu perfil",
+      "description": "Dados do usuário logado, incluindo as preferências de lembrete. Nunca devolve o hash da senha.",
+      "url": "{{ _.base_url }}/users/me",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 100,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_007",
+      "_type": "request",
+      "parentId": "fld_gastos_03",
+      "name": "Atualizar perfil",
+      "description": "Todos os campos são opcionais: `name`, `remindersEnabled` e `reminderDaysBefore` (de 0 a 30; 0 = no dia do vencimento).",
+      "url": "{{ _.base_url }}/users/me",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"remindersEnabled\": true,\n  \"reminderDaysBefore\": 1\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 200,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "fld_gastos_04",
+      "_type": "request_group",
+      "parentId": "wrk_gastos_01",
+      "name": "Categorias",
+      "description": "Todo gasto pertence a uma categoria. Cada usuário novo ganha 5 categorias padrão.",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 400
+    },
+    {
+      "_id": "req_gastos_008",
+      "_type": "request",
+      "parentId": "fld_gastos_04",
+      "name": "Listar categorias",
+      "description": "Em ordem alfabética, com a quantidade de gastos de cada uma. Salva o id de **Streaming** em `category_id`, usado ao criar gastos.",
+      "url": "{{ _.base_url }}/categories",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "// Guarda o id de 'Streaming' (ou da primeira categoria) para criar os gastos de exemplo.\nif (insomnia.response.code === 200) {\n  const categories = insomnia.response.json();\n  const category = categories.find((c) => c.name === 'Streaming') ?? categories[0];\n  if (category) insomnia.baseEnvironment.set('category_id', category.id);\n}",
+      "metaSortKey": 100,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_009",
+      "_type": "request",
+      "parentId": "fld_gastos_04",
+      "name": "Criar categoria",
+      "description": "Cor em hexadecimal. O nome é único por usuário, sem diferenciar maiúsculas: rodar de novo devolve **409**. Salva o id em `new_category_id`.",
+      "url": "{{ _.base_url }}/categories",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Educação\",\n  \"color\": \"#8B5CF6\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "// Salva o id criado em new_category_id, usado pelas próximas requisições.\nif (insomnia.response.code === 201) {\n  insomnia.baseEnvironment.set('new_category_id', insomnia.response.json().id);\n}",
+      "metaSortKey": 200,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_010",
+      "_type": "request",
+      "parentId": "fld_gastos_04",
+      "name": "Editar categoria",
+      "description": "Edita a categoria criada em **Criar categoria**. Os dois campos são opcionais.",
+      "url": "{{ _.base_url }}/categories/{{ _.new_category_id }}",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Cursos\",\n  \"color\": \"#6366F1\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 300,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_011",
+      "_type": "request",
+      "parentId": "fld_gastos_04",
+      "name": "Excluir categoria",
+      "description": "Exclui a categoria criada em **Criar categoria** (204). Categoria com gastos não pode ser excluída: troque `new_category_id` por `category_id` na URL para ver o **409**.",
+      "url": "{{ _.base_url }}/categories/{{ _.new_category_id }}",
+      "method": "DELETE",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 400,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "fld_gastos_05",
+      "_type": "request_group",
+      "parentId": "wrk_gastos_01",
+      "name": "Gastos",
+      "description": "Gastos recorrentes. Valores sempre em centavos e datas no formato `YYYY-MM-DD`.",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 500
+    },
+    {
+      "_id": "req_gastos_012",
+      "_type": "request",
+      "parentId": "fld_gastos_05",
+      "name": "Listar gastos",
+      "description": "Cada gasto vem com o valor vigente hoje e o próximo vencimento. Filtros: `status` (`active`, `inactive` ou `all`) e `categoryId` (desligado; marque para filtrar).",
+      "url": "{{ _.base_url }}/expenses",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "name": "status",
+          "value": "all",
+          "disabled": false
+        },
+        {
+          "name": "categoryId",
+          "value": "{{ _.category_id }}",
+          "disabled": true
+        }
+      ],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 100,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_013",
+      "_type": "request",
+      "parentId": "fld_gastos_05",
+      "name": "Criar gasto mensal",
+      "description": "Rode **Categorias → Listar categorias** antes (ele preenche `category_id`).\n\n- `amountCents`: R$ 55,90 = 5590.\n- `startDate`: primeiro vencimento; define o dia de todos os seguintes.\n- `frequency`: `WEEKLY`, `MONTHLY` ou `YEARLY`. `interval` é o \"a cada quantos\" (3 + `MONTHLY` = trimestral).\n- `paymentMethodId` (opcional): forma de pagamento desde o início. Rode **Formas de pagamento → Criar cartão de crédito** antes, ou remova o campo.\n\nSalva o id em `expense_id`, usado pelas próximas pastas.",
+      "url": "{{ _.base_url }}/expenses",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Netflix\",\n  \"description\": \"Plano padrão\",\n  \"categoryId\": \"{{ _.category_id }}\",\n  \"amountCents\": 5590,\n  \"frequency\": \"MONTHLY\",\n  \"interval\": 1,\n  \"startDate\": \"{{ _.start_date }}\",\n  \"paymentMethodId\": \"{{ _.payment_method_id }}\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "// Salva o id criado em expense_id, usado pelas próximas requisições.\nif (insomnia.response.code === 201) {\n  insomnia.baseEnvironment.set('expense_id', insomnia.response.json().id);\n}",
+      "metaSortKey": 200,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_014",
+      "_type": "request",
+      "parentId": "fld_gastos_05",
+      "name": "Criar gasto parcelado",
+      "description": "Informe `installments` **ou** `endDate`, nunca os dois: com parcelas, a data de fim é calculada. Não altera `expense_id`.",
+      "url": "{{ _.base_url }}/expenses",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Notebook\",\n  \"categoryId\": \"{{ _.category_id }}\",\n  \"amountCents\": 35000,\n  \"frequency\": \"MONTHLY\",\n  \"startDate\": \"{{ _.start_date }}\",\n  \"installments\": 12\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 300,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_015",
+      "_type": "request",
+      "parentId": "fld_gastos_05",
+      "name": "Detalhar gasto",
+      "description": "Detalhe com o histórico de valores. Gasto de outro usuário responde 404 (e não 403), para não revelar que o id existe.",
+      "url": "{{ _.base_url }}/expenses/{{ _.expense_id }}",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 400,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_016",
+      "_type": "request",
+      "parentId": "fld_gastos_05",
+      "name": "Editar gasto",
+      "description": "Edita dados e regra de recorrência. O **valor** não muda aqui: use **Histórico de valores → Registrar reajuste**, para não reescrever os meses passados.",
+      "url": "{{ _.base_url }}/expenses/{{ _.expense_id }}",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Netflix Premium\",\n  \"description\": \"Plano 4K\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 500,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_017",
+      "_type": "request",
+      "parentId": "fld_gastos_05",
+      "name": "Desativar gasto",
+      "description": "Cancela a partir de hoje: os vencimentos anteriores continuam no calendário, os futuros somem.",
+      "url": "{{ _.base_url }}/expenses/{{ _.expense_id }}/deactivate",
+      "method": "POST",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 600,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_018",
+      "_type": "request",
+      "parentId": "fld_gastos_05",
+      "name": "Reativar gasto",
+      "description": "Desfaz a desativação.",
+      "url": "{{ _.base_url }}/expenses/{{ _.expense_id }}/activate",
+      "method": "POST",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 700,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_019",
+      "_type": "request",
+      "parentId": "fld_gastos_05",
+      "name": "Excluir gasto",
+      "description": "Exclui definitivamente, junto com valores e pagamentos (para um gasto criado por engano). Para parar de pagar, prefira **Desativar**.",
+      "url": "{{ _.base_url }}/expenses/{{ _.expense_id }}",
+      "method": "DELETE",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 800,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "fld_gastos_06",
+      "_type": "request_group",
+      "parentId": "wrk_gastos_01",
+      "name": "Histórico de valores",
+      "description": "O valor de um gasto muda por data de vigência, sem alterar os vencimentos anteriores.",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 600
+    },
+    {
+      "_id": "req_gastos_020",
+      "_type": "request",
+      "parentId": "fld_gastos_06",
+      "name": "Listar valores",
+      "description": "Do mais antigo para o mais recente. Cada valor vale a partir de `effectiveFrom`.",
+      "url": "{{ _.base_url }}/expenses/{{ _.expense_id }}/amounts",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 100,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_021",
+      "_type": "request",
+      "parentId": "fld_gastos_06",
+      "name": "Registrar reajuste",
+      "description": "Mudança de preço: vencimentos a partir de `effectiveFrom` usam o novo valor; os anteriores ficam com o antigo. Já existir um valor na mesma data → **409**. Salva o id em `amount_id`.",
+      "url": "{{ _.base_url }}/expenses/{{ _.expense_id }}/amounts",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"amountCents\": 5990,\n  \"effectiveFrom\": \"2027-01-10\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "// Salva o id criado em amount_id, usado pelas próximas requisições.\nif (insomnia.response.code === 201) {\n  insomnia.baseEnvironment.set('amount_id', insomnia.response.json().id);\n}",
+      "metaSortKey": 200,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_022",
+      "_type": "request",
+      "parentId": "fld_gastos_06",
+      "name": "Corrigir valor",
+      "description": "Corrige um valor digitado errado. Diferente do reajuste: altera também os vencimentos passados que usavam esse valor.",
+      "url": "{{ _.base_url }}/expenses/{{ _.expense_id }}/amounts/{{ _.amount_id }}",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"amountCents\": 6290\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 300,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_023",
+      "_type": "request",
+      "parentId": "fld_gastos_06",
+      "name": "Desfazer reajuste",
+      "description": "Remove o reajuste (204). O valor inicial não pode ser removido.",
+      "url": "{{ _.base_url }}/expenses/{{ _.expense_id }}/amounts/{{ _.amount_id }}",
+      "method": "DELETE",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 400,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "fld_gastos_07",
+      "_type": "request_group",
+      "parentId": "wrk_gastos_01",
+      "name": "Calendário e resumo",
+      "description": "Ocorrências calculadas a partir das regras dos gastos (não ficam salvas no banco).",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 700
+    },
+    {
+      "_id": "req_gastos_024",
+      "_type": "request",
+      "parentId": "fld_gastos_07",
+      "name": "Vencimentos do período",
+      "description": "Base do calendário: vencimentos agrupados por dia, com o total previsto e pago de cada dia e do período (máximo de 366 dias). Status de cada um: `PAID`, `PENDING` ou `OVERDUE`.\n\nCada vencimento traz a forma de pagamento vigente naquela data e, no cartão, a fatura em que entra (`invoice`) e o mês em que pesa (`billingMonth`). Filtro opcional: `paymentMethodId` (desligado).",
+      "url": "{{ _.base_url }}/occurrences",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "name": "from",
+          "value": "{{ _.from }}",
+          "disabled": false
+        },
+        {
+          "name": "to",
+          "value": "{{ _.to }}",
+          "disabled": false
+        },
+        {
+          "name": "paymentMethodId",
+          "value": "{{ _.payment_method_id }}",
+          "disabled": true
+        }
+      ],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 100,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_025",
+      "_type": "request",
+      "parentId": "fld_gastos_07",
+      "name": "Resumo do mês",
+      "description": "Quanto cada forma de pagamento cobra no mês (`byPaymentMethod`), previsto x pago, divisão por categoria e projeção dos 6 meses seguintes. Sem `month`, usa o mês atual.\n\nNo cartão de crédito, conta a **fatura que vence no mês**: uma cobrança feita depois do fechamento pesa só no mês seguinte ao da fatura atual. Nas outras formas, conta o mês do vencimento.",
+      "url": "{{ _.base_url }}/summary",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "name": "month",
+          "value": "{{ _.month }}",
+          "disabled": false
+        }
+      ],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 200,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "fld_gastos_08",
+      "_type": "request_group",
+      "parentId": "wrk_gastos_01",
+      "name": "Pagamentos",
+      "description": "Um pagamento é identificado por gasto + data de vencimento. Estas requisições usam `start_date`, o primeiro vencimento do gasto criado em **Criar gasto mensal**.",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 800
+    },
+    {
+      "_id": "req_gastos_026",
+      "_type": "request",
+      "parentId": "fld_gastos_08",
+      "name": "Marcar como pago",
+      "description": "Sem corpo: registra o valor previsto, pago hoje. PUT idempotente: chamar de novo substitui o pagamento. Data que não é vencimento do gasto → 404.",
+      "url": "{{ _.base_url }}/expenses/{{ _.expense_id }}/occurrences/{{ _.start_date }}/payment",
+      "method": "PUT",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 100,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_027",
+      "_type": "request",
+      "parentId": "fld_gastos_08",
+      "name": "Marcar como pago com outro valor",
+      "description": "Corpo opcional: `paidAmountCents` (pagou diferente do previsto) e `paidAt` (data do pagamento; padrão = hoje, nunca no futuro).",
+      "url": "{{ _.base_url }}/expenses/{{ _.expense_id }}/occurrences/{{ _.start_date }}/payment",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"paidAmountCents\": 6100\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 200,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_028",
+      "_type": "request",
+      "parentId": "fld_gastos_08",
+      "name": "Desmarcar pagamento",
+      "description": "Remove o pagamento (204). Idempotente: desmarcar o que não está pago também responde 204.",
+      "url": "{{ _.base_url }}/expenses/{{ _.expense_id }}/occurrences/{{ _.start_date }}/payment",
+      "method": "DELETE",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 300,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "fld_gastos_09",
+      "_type": "request_group",
+      "parentId": "wrk_gastos_01",
+      "name": "Lembretes",
+      "description": "Lembretes por e-mail (BullMQ + Redis). Em desenvolvimento, os e-mails chegam no Mailpit.",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 900
+    },
+    {
+      "_id": "req_gastos_029",
+      "_type": "request",
+      "parentId": "fld_gastos_09",
+      "name": "Disparar lembretes agora",
+      "description": "Só fora de produção. Roda agora a varredura de lembretes do usuário logado, sem esperar as 8h, e responde 202 com quantos e-mails foram para a fila.\n\nOs e-mails aparecem no Mailpit: http://localhost:8025. Lembrete já enviado não é reenviado.",
+      "url": "{{ _.base_url }}/reminders/run",
+      "method": "POST",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 100,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "fld_gastos_10",
+      "_type": "request_group",
+      "parentId": "wrk_gastos_01",
+      "name": "Formas de pagamento",
+      "description": "Por onde o dinheiro sai (cartão, Pix automático, débito em conta...). O resumo mostra quanto cada uma cobra por mês; no cartão de crédito, pela fatura.",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 450
+    },
+    {
+      "_id": "req_gastos_030",
+      "_type": "request",
+      "parentId": "fld_gastos_10",
+      "name": "Listar formas de pagamento",
+      "description": "Em ordem alfabética, com quantos gastos usam ou já usaram cada uma.",
+      "url": "{{ _.base_url }}/payment-methods",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 100,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_031",
+      "_type": "request",
+      "parentId": "fld_gastos_10",
+      "name": "Criar cartão de crédito",
+      "description": "Cartão de crédito exige `closingDay` (fechamento) e `dueDay` (vencimento da fatura). Uma cobrança antes do fechamento entra na fatura daquele mês; no dia do fechamento ou depois, na seguinte.\n\nTipos: `CREDIT_CARD`, `DEBIT_CARD`, `PIX`, `BOLETO`, `ACCOUNT_DEBIT` e `OTHER`. Nome único por usuário (409). Salva o id em `payment_method_id`.",
+      "url": "{{ _.base_url }}/payment-methods",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Cartão Inter\",\n  \"type\": \"CREDIT_CARD\",\n  \"color\": \"#FF7A00\",\n  \"closingDay\": 15,\n  \"dueDay\": 22\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "// Salva o id criado em payment_method_id, usado pelas próximas requisições.\nif (insomnia.response.code === 201) {\n  insomnia.baseEnvironment.set('payment_method_id', insomnia.response.json().id);\n}",
+      "metaSortKey": 200,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_032",
+      "_type": "request",
+      "parentId": "fld_gastos_10",
+      "name": "Criar Pix automático",
+      "description": "Formas que não são cartão de crédito não têm fatura: a cobrança pesa no próprio mês. Mandar `closingDay`/`dueDay` aqui dá 400. Salva o id em `pix_method_id`.",
+      "url": "{{ _.base_url }}/payment-methods",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Pix automático Inter\",\n  \"type\": \"PIX\",\n  \"color\": \"#06B6D4\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "// Salva o id criado em pix_method_id, usado pelas próximas requisições.\nif (insomnia.response.code === 201) {\n  insomnia.baseEnvironment.set('pix_method_id', insomnia.response.json().id);\n}",
+      "metaSortKey": 300,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_033",
+      "_type": "request",
+      "parentId": "fld_gastos_10",
+      "name": "Editar forma de pagamento",
+      "description": "Campos opcionais. Mudar os dias da fatura recalcula em qual mês cada cobrança entra. Deixar de ser cartão apaga os dias; virar cartão exige os dois.",
+      "url": "{{ _.base_url }}/payment-methods/{{ _.payment_method_id }}",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"closingDay\": 10,\n  \"dueDay\": 17\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 400,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_034",
+      "_type": "request",
+      "parentId": "fld_gastos_10",
+      "name": "Excluir forma de pagamento",
+      "description": "Exclui o Pix criado acima (204). Uma forma de pagamento que algum gasto usa ou já usou não pode ser excluída: **409**.",
+      "url": "{{ _.base_url }}/payment-methods/{{ _.pix_method_id }}",
+      "method": "DELETE",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 500,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "fld_gastos_11",
+      "_type": "request_group",
+      "parentId": "wrk_gastos_01",
+      "name": "Histórico de forma de pagamento",
+      "description": "Mesmo padrão do histórico de valores: trocar a forma de pagamento a partir de uma data não muda os meses anteriores.",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 650
+    },
+    {
+      "_id": "req_gastos_035",
+      "_type": "request",
+      "parentId": "fld_gastos_11",
+      "name": "Listar formas do gasto",
+      "description": "Do mais antigo para o mais recente. `paymentMethod: null` = sem forma de pagamento a partir daquela data.",
+      "url": "{{ _.base_url }}/expenses/{{ _.expense_id }}/payment-methods",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 100,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_036",
+      "_type": "request",
+      "parentId": "fld_gastos_11",
+      "name": "Trocar forma de pagamento",
+      "description": "A partir de `effectiveFrom`, os vencimentos usam a nova forma; os anteriores continuam na antiga. `paymentMethodId: null` deixa sem forma de pagamento.\n\nUsa o Pix de **Criar Pix automático**: rode antes de excluí-lo. Vigência repetida → 409; antes do início do gasto → 400. Salva o id em `assignment_id`.",
+      "url": "{{ _.base_url }}/expenses/{{ _.expense_id }}/payment-methods",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"paymentMethodId\": \"{{ _.pix_method_id }}\",\n  \"effectiveFrom\": \"2027-01-10\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "// Salva o id criado em assignment_id, usado pelas próximas requisições.\nif (insomnia.response.code === 201) {\n  insomnia.baseEnvironment.set('assignment_id', insomnia.response.json().id);\n}",
+      "metaSortKey": 200,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_037",
+      "_type": "request",
+      "parentId": "fld_gastos_11",
+      "name": "Corrigir forma de pagamento",
+      "description": "Corrige um registro (escolheu a forma errada). Diferente da troca: muda também os vencimentos passados daquele período.",
+      "url": "{{ _.base_url }}/expenses/{{ _.expense_id }}/payment-methods/{{ _.assignment_id }}",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"paymentMethodId\": \"{{ _.payment_method_id }}\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 300,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_gastos_038",
+      "_type": "request",
+      "parentId": "fld_gastos_11",
+      "name": "Desfazer troca",
+      "description": "Remove o registro (204): o período volta a usar a forma de pagamento anterior.",
+      "url": "{{ _.base_url }}/expenses/{{ _.expense_id }}/payment-methods/{{ _.assignment_id }}",
+      "method": "DELETE",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.access_token }}"
+      },
+      "preRequestScript": "",
+      "afterResponseScript": "",
+      "metaSortKey": 400,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    }
+  ]
+}
