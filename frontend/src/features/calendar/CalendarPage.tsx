@@ -4,9 +4,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import styled from 'styled-components';
 import { fetchOccurrences, useOccurrences } from '../../api/occurrences';
+import { usePaymentMethods } from '../../api/payment-methods';
 import { queryKeys } from '../../api/query-keys';
 import type { OccurrenceDay } from '../../api/types';
 import { Button, IconButton } from '../../components/ui/Button';
+import { Select } from '../../components/ui/Field';
 import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { CenteredSpinner, Spinner } from '../../components/ui/Spinner';
@@ -58,6 +60,11 @@ const Stat = styled.div<{ $tone?: 'success' | 'danger' }>`
       font-size: ${({ theme }) => theme.font.size.lg};
     }
   }
+`;
+
+const Filters = styled.div`
+  max-width: 320px;
+  margin-bottom: ${({ theme }) => theme.space[3]};
 `;
 
 const MonthNav = styled.div`
@@ -116,12 +123,17 @@ export function CalendarPage() {
   const navigate = useNavigate();
   const [month, setMonth] = useMonthParam();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  // Vazio = todas as formas de pagamento.
+  const [paymentMethodId, setPaymentMethodId] = useState('');
+  const paymentMethods = usePaymentMethods();
+  const filter = paymentMethodId || undefined;
   const today = todayIso();
 
   const grid = useMemo(() => monthGrid(month), [month]);
   const { data, isPending, isError, error, refetch, isFetching } = useOccurrences(
     grid.from,
     grid.to,
+    filter,
   );
 
   // Pré-carrega os meses vizinhos: a navegação fica instantânea.
@@ -129,11 +141,11 @@ export function CalendarPage() {
     for (const neighbor of [shiftYearMonth(month, -1), shiftYearMonth(month, 1)]) {
       const { from, to } = monthGrid(neighbor);
       void queryClient.prefetchQuery({
-        queryKey: queryKeys.occurrencesRange(from, to),
-        queryFn: () => fetchOccurrences(from, to),
+        queryKey: queryKeys.occurrencesRange(from, to, filter),
+        queryFn: () => fetchOccurrences(from, to, filter),
       });
     }
-  }, [month, queryClient]);
+  }, [month, filter, queryClient]);
 
   const daysByDate = useMemo(
     () => new Map<string, OccurrenceDay>(data?.days.map((day) => [day.date, day])),
@@ -178,6 +190,23 @@ export function CalendarPage() {
           </MonthNav>
         }
       />
+
+      {(paymentMethods.data?.length ?? 0) > 0 && (
+        <Filters>
+          <Select
+            aria-label="Filtrar por forma de pagamento"
+            value={paymentMethodId}
+            onChange={(event) => setPaymentMethodId(event.target.value)}
+          >
+            <option value="">Todas as formas de pagamento</option>
+            {paymentMethods.data?.map((method) => (
+              <option key={method.id} value={method.id}>
+                {method.name}
+              </option>
+            ))}
+          </Select>
+        </Filters>
+      )}
 
       {isPending ? (
         <CenteredSpinner />
@@ -226,12 +255,22 @@ export function CalendarPage() {
           {!hasAnyInMonth && (
             <EmptyState
               icon={CalendarPlus}
-              title="Nenhum vencimento neste mês"
-              description="Cadastre seus gastos fixos (aluguel, assinaturas, parcelas) e eles aparecem aqui automaticamente, todo mês."
+              title={
+                filter
+                  ? 'Nenhum vencimento nesta forma de pagamento'
+                  : 'Nenhum vencimento neste mês'
+              }
+              description={
+                filter
+                  ? 'Troque o filtro ou escolha esta forma de pagamento nos seus gastos.'
+                  : 'Cadastre seus gastos fixos (aluguel, assinaturas, parcelas) e eles aparecem aqui automaticamente, todo mês.'
+              }
               action={
-                <Button size="sm" onClick={() => navigate('/gastos')}>
-                  Cadastrar gasto
-                </Button>
+                filter ? undefined : (
+                  <Button size="sm" onClick={() => navigate('/gastos')}>
+                    Cadastrar gasto
+                  </Button>
+                )
               }
             />
           )}
