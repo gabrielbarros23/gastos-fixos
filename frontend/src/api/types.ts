@@ -35,10 +35,12 @@ export interface PaymentMethod {
   closingDay: number | null;
   /** Só cartão de crédito */
   dueDay: number | null;
+  /** Só cartões, opcional: 4 últimos dígitos */
+  lastDigits: string | null;
   expenseCount: number;
 }
 
-export type PaymentMethodRef = Pick<PaymentMethod, 'id' | 'name' | 'type' | 'color'>;
+export type PaymentMethodRef = Pick<PaymentMethod, 'id' | 'name' | 'type' | 'color' | 'lastDigits'>;
 
 /** Fatura de cartão de crédito em que uma cobrança entra. */
 export interface Invoice {

@@ -1,5 +1,5 @@
 import { Barcode, CreditCard, Landmark, QrCode, Wallet, type LucideIcon } from 'lucide-react';
-import type { Invoice, PaymentMethod, PaymentMethodType } from '../api/types';
+import type { Invoice, PaymentMethod, PaymentMethodRef, PaymentMethodType } from '../api/types';
 import { formatDayMonth } from './format';
 
 export const PAYMENT_METHOD_TYPES: PaymentMethodType[] = [
@@ -28,6 +28,16 @@ export const PAYMENT_METHOD_ICON: Record<PaymentMethodType, LucideIcon> = {
   BOLETO: Barcode,
   OTHER: Wallet,
 };
+
+/** Cartões têm número impresso (e podem ter os últimos dígitos informados). */
+export function isCardType(type: PaymentMethodType): boolean {
+  return type === 'CREDIT_CARD' || type === 'DEBIT_CARD';
+}
+
+/** "Nubank •••• 4821" (ou só o nome, se não houver dígitos). */
+export function paymentMethodLabel(method: Pick<PaymentMethodRef, 'name' | 'lastDigits'>): string {
+  return method.lastDigits ? `${method.name} •••• ${method.lastDigits}` : method.name;
+}
 
 /** "Cartão de crédito · fecha dia 25, vence dia 5" ou só o tipo. */
 export function describePaymentMethod(

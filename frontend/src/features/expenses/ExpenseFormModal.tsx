@@ -33,7 +33,8 @@ import { MAX_AMOUNT_CENTS } from '../../lib/money';
 import { FREQUENCY_UNIT } from '../../lib/recurrence-label';
 import { usePaymentMethods } from '../../api/payment-methods';
 import { AmountHistory } from './AmountHistory';
-import { PaymentMethodHistory, PaymentMethodOptions } from './PaymentMethodHistory';
+import { PaymentMethodHistory } from './PaymentMethodHistory';
+import { PaymentMethodPicker } from './PaymentMethodPicker';
 
 /** Conteúdo que depende do detalhe do gasto: carregando, erro ou pronto. */
 function detailContent(
@@ -330,14 +331,18 @@ function ExpenseFormContent({ expense, onClose }: Omit<ExpenseFormModalProps, 'o
             error={errors.paymentMethodId?.message}
             hint={
               paymentMethods.data?.length === 0
-                ? 'Cadastre seus cartões e contas em Carteira'
+                ? 'Ainda não tem nenhuma? Crie no + ao lado'
                 : 'Cartão de crédito entra no mês em que a fatura vence'
             }
           >
             {(a11y) => (
-              <Select {...a11y} {...register('paymentMethodId')}>
-                <PaymentMethodOptions methods={paymentMethods.data ?? []} />
-              </Select>
+              <Controller
+                control={control}
+                name="paymentMethodId"
+                render={({ field }) => (
+                  <PaymentMethodPicker {...a11y} value={field.value} onChange={field.onChange} />
+                )}
+              />
             )}
           </Field>
         )}

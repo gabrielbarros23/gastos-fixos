@@ -1,33 +1,19 @@
-import { zodResolver } from '@hookform/resolvers/zod';
 import { Pencil, Plus, Trash2, Wallet } from 'lucide-react';
 import { useState } from 'react';
-import { Controller, useForm, useWatch } from 'react-hook-form';
 import styled from 'styled-components';
-import { z } from 'zod';
-import { applyFieldErrors, errorMessage, errorStatus } from '../../api/errors';
-import {
-  useDeletePaymentMethod,
-  usePaymentMethods,
-  useSavePaymentMethod,
-} from '../../api/payment-methods';
-import type { PaymentMethod, PaymentMethodType } from '../../api/types';
+import { errorMessage } from '../../api/errors';
+import { useDeletePaymentMethod, usePaymentMethods } from '../../api/payment-methods';
+import type { PaymentMethod } from '../../api/types';
 import { Button, IconButton } from '../../components/ui/Button';
-import { ColorPicker } from '../../components/ui/ColorPicker';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
-import { Field, FieldRow, Form, FormError, Input, Select } from '../../components/ui/Field';
-import { Modal, ModalActions } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { PaymentMethodIcon } from '../../components/ui/PaymentMethodIcon';
 import { CenteredSpinner } from '../../components/ui/Spinner';
 import { EmptyState, ErrorState } from '../../components/ui/States';
 import { useToast } from '../../components/ui/Toast';
 import { pluralize } from '../../lib/format';
-import { PALETTE } from '../../lib/palette';
-import {
-  describePaymentMethod,
-  PAYMENT_METHOD_TYPE_LABEL,
-  PAYMENT_METHOD_TYPES,
-} from '../../lib/payment-methods';
+import { describePaymentMethod, paymentMethodLabel } from '../../lib/payment-methods';
+import { PaymentMethodFormModal } from './PaymentMethodFormModal';
 
 const Grid = styled.ul`
   list-style: none;
@@ -63,198 +49,6 @@ const Item = styled.li`
     color: ${({ theme }) => theme.colors.textMuted};
   }
 `;
-
-const Help = styled.p`
-  font-size: ${({ theme }) => theme.font.size.xs};
-  color: ${({ theme }) => theme.colors.textSubtle};
-`;
-
-const isDay = (value: string) =>
-  /^\d{1,2}$/.test(value) && Number(value) >= 1 && Number(value) <= 31;
-
-const schema = z
-  .object({
-    name: z.string().trim().min(1, 'Informe o nome').max(50, 'Máximo de 50 caracteres'),
-    type: z.enum(PAYMENT_METHOD_TYPES as [PaymentMethodType, ...PaymentMethodType[]]),
-    color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Escolha uma cor'),
-    // Texto no formulário; vira número (ou null) ao enviar.
-    closingDay: z.string(),
-    dueDay: z.string(),
-  })
-  .superRefine((values, ctx) => {
-    if (values.type !== 'CREDIT_CARD') return;
-    for (const field of ['closingDay', 'dueDay'] as const) {
-      if (!isDay(values[field])) {
-        ctx.addIssue({ code: 'custom', path: [field], message: 'Informe um dia de 1 a 31' });
-      }
-    }
-  });
-type PaymentMethodForm = z.infer<typeof schema>;
-
-function PaymentMethodFormModal({
-  method,
-  open,
-  onClose,
-}: {
-  method?: PaymentMethod;
-  open: boolean;
-  onClose: () => void;
-}) {
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={method ? 'Editar forma de pagamento' : 'Nova forma de pagamento'}
-      width={480}
-    >
-      <PaymentMethodFormContent method={method} onClose={onClose} />
-    </Modal>
-  );
-}
-
-function PaymentMethodFormContent({
-  method,
-  onClose,
-}: {
-  method?: PaymentMethod;
-  onClose: () => void;
-}) {
-  const toast = useToast();
-  const save = useSavePaymentMethod();
-  const [formError, setFormError] = useState<string | null>(null);
-  const {
-    register,
-    control,
-    handleSubmit,
-    setError,
-    formState: { errors, isSubmitting },
-  } = useForm<PaymentMethodForm>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      name: method?.name ?? '',
-      type: method?.type ?? 'CREDIT_CARD',
-      color: method?.color ?? PALETTE[0],
-      closingDay: method?.closingDay ? String(method.closingDay) : '',
-      dueDay: method?.dueDay ? String(method.dueDay) : '',
-    },
-  });
-  const type = useWatch({ control, name: 'type' });
-  const isCard = type === 'CREDIT_CARD';
-
-  const onSubmit = handleSubmit(async (values) => {
-    setFormError(null);
-    try {
-      await save.mutateAsync({
-        id: method?.id,
-        name: values.name,
-        type: values.type,
-        color: values.color,
-        closingDay: isCard ? Number(values.closingDay) : null,
-        dueDay: isCard ? Number(values.dueDay) : null,
-      });
-      toast.success(method ? 'Forma de pagamento atualizada' : 'Forma de pagamento criada');
-      onClose();
-    } catch (error) {
-      if (errorStatus(error) === 409) {
-        setError('name', { message: 'Já existe uma forma de pagamento com esse nome' });
-      } else if (
-        !applyFieldErrors(error, setError, ['name', 'type', 'color', 'closingDay', 'dueDay'])
-      ) {
-        setFormError(errorMessage(error));
-      }
-    }
-  });
-
-  return (
-    <Form onSubmit={onSubmit} noValidate>
-      {formError && <FormError>{formError}</FormError>}
-      <FieldRow>
-        <Field label="Nome" error={errors.name?.message}>
-          {(a11y) => (
-            <Input {...a11y} placeholder="Ex.: Nubank" data-autofocus {...register('name')} />
-          )}
-        </Field>
-        <Field label="Tipo" error={errors.type?.message}>
-          {(a11y) => (
-            <Select {...a11y} {...register('type')}>
-              {PAYMENT_METHOD_TYPES.map((value) => (
-                <option key={value} value={value}>
-                  {PAYMENT_METHOD_TYPE_LABEL[value]}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
-      </FieldRow>
-
-      {isCard && (
-        <>
-          <FieldRow>
-            <Field
-              label="Fechamento da fatura"
-              error={errors.closingDay?.message}
-              hint="Dia do mês"
-            >
-              {(a11y) => (
-                <Input
-                  {...a11y}
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={31}
-                  placeholder="Ex.: 25"
-                  {...register('closingDay')}
-                />
-              )}
-            </Field>
-            <Field label="Vencimento da fatura" error={errors.dueDay?.message} hint="Dia do mês">
-              {(a11y) => (
-                <Input
-                  {...a11y}
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={31}
-                  placeholder="Ex.: 5"
-                  {...register('dueDay')}
-                />
-              )}
-            </Field>
-          </FieldRow>
-          <Help>
-            Cobranças antes do fechamento entram na fatura daquele mês; no dia do fechamento ou
-            depois, na fatura seguinte. O resumo conta cada cobrança no mês em que a fatura vence.
-          </Help>
-        </>
-      )}
-
-      <Controller
-        control={control}
-        name="color"
-        render={({ field }) => (
-          <Field label="Cor" error={errors.color?.message}>
-            {({ id }) => (
-              <ColorPicker
-                id={id}
-                label="Cor da forma de pagamento"
-                value={field.value}
-                onChange={field.onChange}
-              />
-            )}
-          </Field>
-        )}
-      />
-      <ModalActions>
-        <Button variant="secondary" onClick={onClose}>
-          Cancelar
-        </Button>
-        <Button type="submit" loading={isSubmitting}>
-          Salvar
-        </Button>
-      </ModalActions>
-    </Form>
-  );
-}
 
 type Dialog =
   | { type: 'create' }
@@ -306,7 +100,7 @@ export function PaymentMethodsPage() {
             <Item key={method.id}>
               <PaymentMethodIcon method={method} />
               <div>
-                <strong>{method.name}</strong>
+                <strong>{paymentMethodLabel(method)}</strong>
                 <span>{describePaymentMethod(method)}</span>
                 <span>{pluralize(method.expenseCount, 'gasto', 'gastos')}</span>
               </div>

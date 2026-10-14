@@ -14,6 +14,7 @@ import {
   describeInvoice,
   NO_PAYMENT_METHOD,
   PAYMENT_METHOD_TYPE_LABEL,
+  paymentMethodLabel,
 } from '../../lib/payment-methods';
 import { useMonthParam } from '../../lib/useMonthParam';
 import { ProjectionChart, type ProjectionSegment } from './ProjectionChart';
@@ -202,7 +203,7 @@ function toSegments(items: MethodTotals[]): ProjectionSegment[] {
     })
     .map(({ paymentMethod, expectedCents }) => ({
       key: paymentMethod?.id ?? 'none',
-      label: paymentMethod?.name ?? NO_PAYMENT_METHOD,
+      label: paymentMethod ? paymentMethodLabel(paymentMethod) : NO_PAYMENT_METHOD,
       color: paymentMethod?.color,
       cents: expectedCents,
     }));
@@ -326,7 +327,9 @@ export function SummaryPage() {
                 <MethodRow key={paymentMethod?.id ?? 'none'}>
                   <PaymentMethodIcon method={paymentMethod} />
                   <MethodInfo>
-                    <strong>{paymentMethod?.name ?? NO_PAYMENT_METHOD}</strong>
+                    <strong>
+                      {paymentMethod ? paymentMethodLabel(paymentMethod) : NO_PAYMENT_METHOD}
+                    </strong>
                     <small>
                       {invoice
                         ? describeInvoice(invoice)

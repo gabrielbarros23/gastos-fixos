@@ -10,7 +10,7 @@ import { MoneyInput } from '../../components/ui/MoneyInput';
 import { useToast } from '../../components/ui/Toast';
 import { todayIso } from '../../lib/dates';
 import { formatCents, formatDate } from '../../lib/format';
-import { describeInvoice } from '../../lib/payment-methods';
+import { describeInvoice, paymentMethodLabel } from '../../lib/payment-methods';
 import { STATUS_LABEL, STATUS_TONE } from './status';
 
 const Item = styled.li`
@@ -145,7 +145,7 @@ export function OccurrenceItem({ occurrence }: { occurrence: Occurrence }) {
           {occurrence.paymentMethod && (
             <Meta>
               <ColorDot $color={occurrence.paymentMethod.color} $size={8} />
-              <span>{occurrence.paymentMethod.name}</span>
+              <span>{paymentMethodLabel(occurrence.paymentMethod)}</span>
               {occurrence.invoice && <span>· {describeInvoice(occurrence.invoice)}</span>}
             </Meta>
           )}

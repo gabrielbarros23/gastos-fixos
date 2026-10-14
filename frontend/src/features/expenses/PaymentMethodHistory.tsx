@@ -16,9 +16,8 @@ import { Field, FormError, Input, Select } from '../../components/ui/Field';
 import { useToast } from '../../components/ui/Toast';
 import { todayIso } from '../../lib/dates';
 import { formatDate } from '../../lib/format';
-import { NO_PAYMENT_METHOD } from '../../lib/payment-methods';
-
-const UNSET = '__unset';
+import { NO_PAYMENT_METHOD, paymentMethodLabel } from '../../lib/payment-methods';
+import { PaymentMethodOptions, PaymentMethodPicker, UNSET } from './PaymentMethodPicker';
 
 const List = styled.ul`
   list-style: none;
@@ -81,20 +80,6 @@ const Help = styled.p`
   color: ${({ theme }) => theme.colors.textSubtle};
 `;
 
-/** Select das formas de pagamento, com "sem forma" (valor vazio) no topo. */
-export function PaymentMethodOptions({ methods }: { methods: PaymentMethod[] }) {
-  return (
-    <>
-      <option value="">{NO_PAYMENT_METHOD}</option>
-      {methods.map((method) => (
-        <option key={method.id} value={method.id}>
-          {method.name}
-        </option>
-      ))}
-    </>
-  );
-}
-
 function HistoryRow({
   assignment,
   expense,
@@ -140,7 +125,9 @@ function HistoryRow({
         ) : (
           <strong>
             {assignment.paymentMethod && <ColorDot $color={assignment.paymentMethod.color} />}
-            {assignment.paymentMethod?.name ?? NO_PAYMENT_METHOD}
+            {assignment.paymentMethod
+              ? paymentMethodLabel(assignment.paymentMethod)
+              : NO_PAYMENT_METHOD}
           </strong>
         )}
         {assignment.effectiveFrom === expense.startDate
@@ -241,16 +228,12 @@ export function PaymentMethodHistory({ expense }: { expense: ExpenseDetail }) {
       >
         <Field label={history.length === 0 ? 'Forma de pagamento' : 'Nova forma'}>
           {(a11y) => (
-            <Select
+            <PaymentMethodPicker
               {...a11y}
+              requireChoice
               value={paymentMethodId}
-              onChange={(event) => setPaymentMethodId(event.target.value)}
-            >
-              <option value={UNSET} disabled>
-                Escolha…
-              </option>
-              <PaymentMethodOptions methods={options} />
-            </Select>
+              onChange={setPaymentMethodId}
+            />
           )}
         </Field>
         <Field label="Vale a partir de">

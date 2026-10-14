@@ -22,6 +22,7 @@ import {
   todayIso,
 } from '../../lib/dates';
 import { capitalize, formatCents, pluralize } from '../../lib/format';
+import { paymentMethodLabel } from '../../lib/payment-methods';
 import { useMonthParam } from '../../lib/useMonthParam';
 import { MonthGrid } from './MonthGrid';
 import { OccurrenceItem } from './OccurrenceItem';
@@ -201,7 +202,7 @@ export function CalendarPage() {
             <option value="">Todas as formas de pagamento</option>
             {paymentMethods.data?.map((method) => (
               <option key={method.id} value={method.id}>
-                {method.name}
+                {paymentMethodLabel(method)}
               </option>
             ))}
           </Select>

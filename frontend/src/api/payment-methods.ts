@@ -9,6 +9,7 @@ export interface PaymentMethodInput {
   color: string;
   closingDay: number | null;
   dueDay: number | null;
+  lastDigits: string | null;
 }
 
 export function usePaymentMethods() {

@@ -20,6 +20,7 @@ import { CenteredSpinner } from '../../components/ui/Spinner';
 import { EmptyState, ErrorState } from '../../components/ui/States';
 import { useToast } from '../../components/ui/Toast';
 import { formatCents, formatDate } from '../../lib/format';
+import { paymentMethodLabel } from '../../lib/payment-methods';
 import { describeRecurrence } from '../../lib/recurrence-label';
 import { ExpenseFormModal } from './ExpenseFormModal';
 
@@ -214,7 +215,7 @@ export function ExpensesPage() {
                   <p>
                     {expense.category.name} · {describeRecurrence(expense)}
                     {end && ` · ${end}`}
-                    {expense.paymentMethod && ` · ${expense.paymentMethod.name}`}
+                    {expense.paymentMethod && ` · ${paymentMethodLabel(expense.paymentMethod)}`}
                   </p>
                 </Main>
                 <Money>
