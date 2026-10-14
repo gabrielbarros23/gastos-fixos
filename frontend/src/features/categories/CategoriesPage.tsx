@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Check, Pencil, Plus, Tags, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Tags, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import styled from 'styled-components';
@@ -9,6 +9,7 @@ import { applyFieldErrors, errorMessage, errorStatus } from '../../api/errors';
 import type { Category } from '../../api/types';
 import { Button, IconButton } from '../../components/ui/Button';
 import { ColorDot } from '../../components/ui/Card';
+import { ColorPicker } from '../../components/ui/ColorPicker';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Field, Form, FormError, Input } from '../../components/ui/Field';
 import { Modal, ModalActions } from '../../components/ui/Modal';
@@ -17,21 +18,7 @@ import { CenteredSpinner } from '../../components/ui/Spinner';
 import { EmptyState, ErrorState } from '../../components/ui/States';
 import { useToast } from '../../components/ui/Toast';
 import { pluralize } from '../../lib/format';
-
-const PALETTE = [
-  '#6366F1',
-  '#EC4899',
-  '#10B981',
-  '#F59E0B',
-  '#64748B',
-  '#EF4444',
-  '#06B6D4',
-  '#8B5CF6',
-  '#84CC16',
-  '#F97316',
-  '#14B8A6',
-  '#A855F7',
-];
+import { PALETTE } from '../../lib/palette';
 
 const Grid = styled.ul`
   list-style: none;
@@ -64,41 +51,6 @@ const Item = styled.li`
   span {
     font-size: ${({ theme }) => theme.font.size.xs};
     color: ${({ theme }) => theme.colors.textMuted};
-  }
-`;
-
-const Swatches = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: ${({ theme }) => theme.space[2]};
-`;
-
-const Swatch = styled.button<{ $color: string; $selected: boolean }>`
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 2px solid ${({ theme, $selected }) => ($selected ? theme.colors.text : 'transparent')};
-  background: ${({ $color }) => $color};
-  color: #fff;
-`;
-
-const CustomColor = styled.input`
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 1px dashed ${({ theme }) => theme.colors.borderStrong};
-  border-radius: 50%;
-  background: none;
-  cursor: pointer;
-
-  &::-webkit-color-swatch-wrapper {
-    padding: 3px;
-  }
-  &::-webkit-color-swatch {
-    border: none;
-    border-radius: 50%;
   }
 `;
 
@@ -173,32 +125,12 @@ function CategoryFormContent({ category, onClose }: { category?: Category; onClo
         render={({ field }) => (
           <Field label="Cor" error={errors.color?.message}>
             {({ id }) => (
-              <Swatches id={id} role="radiogroup" aria-label="Cor da categoria">
-                {PALETTE.map((color) => {
-                  const selected = field.value.toUpperCase() === color;
-                  return (
-                    <Swatch
-                      key={color}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      aria-label={color}
-                      $color={color}
-                      $selected={selected}
-                      onClick={() => field.onChange(color)}
-                    >
-                      {selected && <Check size={16} strokeWidth={3} />}
-                    </Swatch>
-                  );
-                })}
-                <CustomColor
-                  type="color"
-                  aria-label="Outra cor"
-                  title="Outra cor"
-                  value={field.value}
-                  onChange={(event) => field.onChange(event.target.value.toUpperCase())}
-                />
-              </Swatches>
+              <ColorPicker
+                id={id}
+                label="Cor da categoria"
+                value={field.value}
+                onChange={field.onChange}
+              />
             )}
           </Field>
         )}
