@@ -22,9 +22,10 @@ model User {
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  refreshTokens RefreshToken[]
-  categories    Category[]
-  expenses      Expense[]
+  refreshTokens  RefreshToken[]
+  categories     Category[]
+  paymentMethods PaymentMethod[]
+  expenses       Expense[]
 
   @@map("users")
 }
@@ -71,6 +72,38 @@ model Category {
   @@map("categories")
 }
 
+enum PaymentMethodType {
+  CREDIT_CARD // entra na fatura: o mês é o do vencimento da fatura
+  DEBIT_CARD
+  PIX // inclui Pix automático
+  BOLETO
+  ACCOUNT_DEBIT // débito automático em conta
+  OTHER
+
+  @@map("payment_method_type")
+}
+
+// Por onde o dinheiro sai (cartão Nubank, Pix automático do C6...). Cadastrada
+// pelo usuário. O resumo mostra quanto cada uma vai cobrar em cada mês.
+model PaymentMethod {
+  id         String            @id @default(uuid(7)) @db.Uuid
+  userId     String            @map("user_id") @db.Uuid
+  name       String
+  type       PaymentMethodType
+  color      String // "#RRGGBB"
+  // Só cartão de crédito (CHECK no banco): definem em qual fatura cada cobrança entra.
+  closingDay Int?              @map("closing_day")
+  dueDay     Int?              @map("due_day")
+  createdAt  DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignments ExpensePaymentMethod[]
+
+  @@unique([userId, name])
+  @@map("payment_methods")
+}
+
 // Guarda a REGRA do gasto. As ocorrências (cada vencimento) são calculadas sob
 // demanda a partir dela e nunca são gravadas antecipadamente.
 model Expense {
@@ -92,9 +125,10 @@ model Expense {
   user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   // Restrict: o banco impede excluir uma categoria que ainda tem gastos.
   category  Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  amounts   ExpenseAmount[]
-  payments  Payment[]
-  reminders ReminderLog[]
+  amounts        ExpenseAmount[]
+  paymentMethods ExpensePaymentMethod[]
+  payments       Payment[]
+  reminders      ReminderLog[]
 
   @@index([userId])
   // O Postgres não indexa FKs sozinho; sem isso, cada exclusão de categoria
@@ -116,6 +150,27 @@ model ExpenseAmount {
 
   @@unique([expenseId, effectiveFrom])
   @@map("expense_amounts")
+}
+
+// Histórico da forma de pagamento, no mesmo padrão do histórico de valor: trocar
+// a Netflix do Nubank para o PicPay em junho é inserir uma linha vigente desde
+// junho, e os meses anteriores continuam no Nubank. Opcional: sem nenhuma linha
+// vigente, o vencimento fica "sem forma de pagamento".
+model ExpensePaymentMethod {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  expenseId       String   @map("expense_id") @db.Uuid
+  // null = deixa de ter forma de pagamento a partir de effectiveFrom
+  paymentMethodId String?  @map("payment_method_id") @db.Uuid
+  effectiveFrom   DateTime @map("effective_from") @db.Date
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  expense       Expense        @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  // Restrict: não dá para excluir uma forma de pagamento que algum gasto usa ou usou.
+  paymentMethod PaymentMethod? @relation(fields: [paymentMethodId], references: [id], onDelete: Restrict)
+
+  @@unique([expenseId, effectiveFrom])
+  @@index([paymentMethodId])
+  @@map("expense_payment_methods")
 }
 
 // Uma ocorrência só é gravada quando algo acontece com ela: aqui, o pagamento.
