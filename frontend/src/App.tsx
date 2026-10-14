@@ -59,6 +59,13 @@ const router = createBrowserRouter([
                 ...page(() => import('./features/expenses/ExpensesPage'), 'ExpensesPage'),
               },
               {
+                path: 'formas-de-pagamento',
+                ...page(
+                  () => import('./features/payment-methods/PaymentMethodsPage'),
+                  'PaymentMethodsPage',
+                ),
+              },
+              {
                 path: 'categorias',
                 ...page(() => import('./features/categories/CategoriesPage'), 'CategoriesPage'),
               },

@@ -3,11 +3,13 @@ import type { QueryClient } from '@tanstack/react-query';
 /** Chaves do cache do React Query, num lugar só. */
 export const queryKeys = {
   categories: ['categories'] as const,
+  paymentMethods: ['payment-methods'] as const,
   expenses: ['expenses'] as const,
   expenseList: (filters: object) => ['expenses', 'list', filters] as const,
   expense: (id: string) => ['expenses', 'detail', id] as const,
   occurrences: ['occurrences'] as const,
-  occurrencesRange: (from: string, to: string) => ['occurrences', from, to] as const,
+  occurrencesRange: (from: string, to: string, paymentMethodId?: string) =>
+    ['occurrences', from, to, paymentMethodId ?? 'all'] as const,
   summary: ['summary'] as const,
   summaryMonth: (month: string) => ['summary', month] as const,
 };
@@ -24,5 +26,6 @@ export function invalidateFinancialData(queryClient: QueryClient): Promise<void>
     queryClient.invalidateQueries({ queryKey: queryKeys.occurrences }),
     queryClient.invalidateQueries({ queryKey: queryKeys.summary }),
     queryClient.invalidateQueries({ queryKey: queryKeys.categories }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.paymentMethods }),
   ]).then(() => undefined);
 }

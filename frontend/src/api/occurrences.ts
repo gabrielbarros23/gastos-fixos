@@ -3,16 +3,17 @@ import { api } from './client';
 import { invalidateFinancialData, queryKeys } from './query-keys';
 import type { Occurrence, OccurrencesResponse, Summary } from './types';
 
-export function fetchOccurrences(from: string, to: string) {
+export function fetchOccurrences(from: string, to: string, paymentMethodId?: string) {
   return api
-    .get<OccurrencesResponse>('/occurrences', { params: { from, to } })
+    .get<OccurrencesResponse>('/occurrences', { params: { from, to, paymentMethodId } })
     .then((response) => response.data);
 }
 
-export function useOccurrences(from: string, to: string) {
+/** `paymentMethodId` ausente = todas as formas de pagamento. */
+export function useOccurrences(from: string, to: string, paymentMethodId?: string) {
   return useQuery({
-    queryKey: queryKeys.occurrencesRange(from, to),
-    queryFn: () => fetchOccurrences(from, to),
+    queryKey: queryKeys.occurrencesRange(from, to, paymentMethodId),
+    queryFn: () => fetchOccurrences(from, to, paymentMethodId),
     // Ao trocar de mês, mantém o mês anterior na tela até o novo chegar
     // (evita o calendário "piscar" vazio).
     placeholderData: keepPreviousData,

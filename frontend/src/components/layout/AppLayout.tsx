@@ -7,6 +7,7 @@ import {
   Settings,
   Sun,
   Tags,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router';
@@ -19,6 +20,7 @@ const NAV_ITEMS: { to: string; label: string; icon: LucideIcon }[] = [
   { to: '/', label: 'Calendário', icon: CalendarDays },
   { to: '/resumo', label: 'Resumo', icon: ChartColumnBig },
   { to: '/gastos', label: 'Gastos', icon: ReceiptText },
+  { to: '/formas-de-pagamento', label: 'Carteira', icon: Wallet },
   { to: '/categorias', label: 'Categorias', icon: Tags },
   { to: '/configuracoes', label: 'Ajustes', icon: Settings },
 ];
