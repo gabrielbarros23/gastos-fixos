@@ -1,9 +1,8 @@
-import { compareDates, type CalendarDate } from './calendar-date.js';
+import type { CalendarDate } from './calendar-date.js';
+import { recordAt, type EffectiveRecord } from './effective-history.js';
 
-export interface AmountRecord {
+export interface AmountRecord extends EffectiveRecord {
   amountCents: number;
-  /** Vale para vencimentos a partir desta data (inclusive). */
-  effectiveFrom: CalendarDate;
 }
 
 /**
@@ -15,14 +14,5 @@ export function amountAt(
   history: readonly AmountRecord[],
   date: CalendarDate,
 ): number | undefined {
-  let current: AmountRecord | undefined;
-  for (const record of history) {
-    const appliesToDate = compareDates(record.effectiveFrom, date) <= 0;
-    const isMoreRecent =
-      !current || compareDates(record.effectiveFrom, current.effectiveFrom) > 0;
-    if (appliesToDate && isMoreRecent) {
-      current = record;
-    }
-  }
-  return current?.amountCents;
+  return recordAt(history, date)?.amountCents;
 }
