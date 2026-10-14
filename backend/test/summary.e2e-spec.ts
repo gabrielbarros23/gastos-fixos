@@ -123,7 +123,14 @@ describe('Resumo (e2e)', () => {
       .expect(200);
 
     const monthly = 150000 + 5990 + 9990;
-    expect(res.body.projection).toEqual([
+    expect(
+      res.body.projection.map(
+        (m: { month: string; expectedCents: number }) => ({
+          month: m.month,
+          expectedCents: m.expectedCents,
+        }),
+      ),
+    ).toEqual([
       { month: '2026-04', expectedCents: monthly + 10000 }, // parcela 1/2 do fone
       { month: '2026-05', expectedCents: monthly + 10000 }, // parcela 2/2
       { month: '2026-06', expectedCents: monthly + 180000 }, // IPVA
