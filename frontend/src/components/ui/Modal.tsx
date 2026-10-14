@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { useEffect, useRef, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 import { IconButton } from './Button';
 
@@ -64,6 +65,10 @@ interface ModalProps {
  * Modal com o <dialog> nativo: o navegador já cuida de prender o foco dentro
  * dele, fechar no Esc e escurecer o fundo. O conteúdo só é montado quando está
  * aberto, então formulários sempre abrem limpos.
+ *
+ * Fica num portal no <body>: um modal aberto de dentro de um formulário (ex.:
+ * "nova forma de pagamento" no meio do cadastro de gasto) não vira um <form>
+ * dentro de outro no HTML.
  */
 export function Modal({ open, onClose, title, width = 520, children }: ModalProps) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -81,15 +86,20 @@ export function Modal({ open, onClose, title, width = 520, children }: ModalProp
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
-  return (
+  return createPortal(
     <Dialog
       ref={ref}
       $width={width}
+      // Os eventos de um modal aberto por cima deste (ex.: "nova forma de
+      // pagamento" dentro do "novo gasto") sobem pela árvore do React até aqui.
+      // Só reagimos aos que aconteceram neste próprio <dialog>.
       onCancel={(event) => {
+        if (event.target !== ref.current) return;
         event.preventDefault(); // quem fecha é o estado do React (open=false)
         onClose();
       }}
-      onClose={() => {
+      onClose={(event) => {
+        if (event.target !== ref.current) return;
         // Se o navegador fechar o dialog por conta própria, sincroniza o estado.
         if (open) onClose();
       }}
@@ -98,7 +108,10 @@ export function Modal({ open, onClose, title, width = 520, children }: ModalProp
       }}
     >
       {open && (
-        <Panel>
+        // Eventos do React sobem pela árvore de componentes mesmo através do
+        // portal: sem isto, salvar o formulário do modal também enviaria o
+        // formulário de quem abriu o modal.
+        <Panel onSubmit={(event) => event.stopPropagation()}>
           <Header>
             <Title>{title}</Title>
             <IconButton label="Fechar" onClick={onClose}>
@@ -108,7 +121,8 @@ export function Modal({ open, onClose, title, width = 520, children }: ModalProp
           <Body>{children}</Body>
         </Panel>
       )}
-    </Dialog>
+    </Dialog>,
+    document.body,
   );
 }
 
